@@ -1,17 +1,17 @@
-#ifndef FOURKU_H
-#define FOURKU_H 1
+#ifndef LUX_H
+#define LUX_H 1
 
 #include "../base.h"
 #include "../external/chess.hpp"
 #include <string>
 #include <vector>
 
-namespace Fourku
+namespace Lux
 {
-    class FourkuEval
+    class LuxEval
     {
     public:
-        constexpr static bool includes_additional_score = true;
+        constexpr static bool includes_additional_score = false;
         constexpr static bool supports_external_chess_eval = true;
 
         static parameters_t get_initial_parameters();
@@ -21,4 +21,4 @@ namespace Fourku
     };
 }
 
-#endif // 4KU_H
+#endif // LUX_H
