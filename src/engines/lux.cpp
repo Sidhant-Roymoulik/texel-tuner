@@ -100,6 +100,17 @@ int semi_open_file = S(17, 15);
 
 #define TraceIncr(parameter) trace.parameter[(int)c]++
 
+void init_eval_tables()
+{
+    for (int i = (int)PieceType::PAWN; i <= (int)PieceType::KING; i++)
+    {
+        for (int j = Square::SQ_A1; j <= Square::SQ_H8; j++)
+        {
+            pst[i][j] += material[i];
+        }
+    }
+}
+
 template <Color c>
 int eval_pawn(EvalInfo &info, const Board &board, Trace &trace)
 {
@@ -117,7 +128,6 @@ int eval_pawn(EvalInfo &info, const Board &board, Trace &trace)
 
         score += pst[(int)PieceType::PAWN][sq];
         TraceIncr(pst[(int)PieceType::PAWN][sq]);
-        score += material[(int)PieceType::PAWN];
         TraceIncr(material[(int)PieceType::PAWN]);
     }
 
@@ -161,7 +171,6 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace)
 
         score += pst[(int)p][sq];
         TraceIncr(pst[(int)p][sq]);
-        score += material[(int)p];
         TraceIncr(material[(int)p]);
     }
 
@@ -180,7 +189,6 @@ int eval_king(const Board &board, Trace &trace)
 
     score += pst[(int)PieceType::KING][sq];
     TraceIncr(pst[(int)PieceType::KING][sq]);
-    score += material[(int)PieceType::KING];
     TraceIncr(material[(int)PieceType::KING]);
 
     return score;
@@ -208,6 +216,7 @@ void eval_pieces(EvalInfo &info, const Board &board, Trace &trace)
 Trace evaluate(const Board &board)
 {
     Trace trace{};
+    init_eval_tables();
 
     // Check for draw by insufficient material
     // if (board.isInsufficientMaterial())
@@ -291,7 +300,6 @@ static int32_t round_value(tune_t value)
 }
 
 #if TAPERED
-
 static void print_parameter(std::stringstream &ss, const pair_t parameter)
 {
     const auto mg = round_value(parameter[static_cast<int32_t>(PhaseStages::Midgame)]);
@@ -327,7 +335,8 @@ static void print_array(std::stringstream &ss, const parameters_t &parameters, i
             ss << ", ";
         }
     }
-    ss << "};" << endl;
+    ss << "};" << endl
+       << endl;
 }
 
 static void print_array_2d(std::stringstream &ss, const parameters_t &parameters, int &index, const std::string &name, int count1, int count2)
@@ -335,7 +344,7 @@ static void print_array_2d(std::stringstream &ss, const parameters_t &parameters
     ss << "const int " << name << "[" << count1 << "][" << count2 << "] = {\n";
     for (auto i = 0; i < count1; i++)
     {
-        ss << "    {";
+        ss << "{";
         for (auto j = 0; j < count2; j++)
         {
             print_parameter(ss, parameters[index]);
@@ -345,27 +354,78 @@ static void print_array_2d(std::stringstream &ss, const parameters_t &parameters
             {
                 ss << ", ";
             }
-            if (j % 8 == 7)
-            {
-                ss << endl;
-            }
         }
         ss << "},\n";
     }
     ss << "};\n";
 }
 
+static void print_pst(std::stringstream &ss, parameters_t &parameters, int &index, const std::string &name, int count1, int count2)
+{
+    // Normalize PST
+    for (auto i = 0; i < count1; i++)
+    {
+        int sum = 0;
+        for (auto j = 0; j < count2; j++)
+        {
+            if (i == 0 && (j < 8 || j >= 56))
+                continue;
+
+            sum += parameters[index + count2 * i + j][0] + parameters[index + count2 * i + j][1];
+        }
+
+        for (auto j = 0; j < count2; j++)
+        {
+            if (i == 0 && (j < 8 || j >= 56))
+                continue;
+
+            parameters[index + count2 * i + j][0] -= sum / count2 / 2;
+            parameters[index + count2 * i + j][1] -= sum / count2 / 2;
+        }
+    }
+
+    string names[6] = {"Pawn", "Knight", "Bishop", "Rook", "Queen", "King"};
+
+    ss << "int " << name << "[" << count1 << "][" << count2 << "] = {\n";
+    for (auto i = 0; i < count1; i++)
+    {
+        ss << "// " << names[i] << " PST\n";
+        ss << "{";
+        for (auto j = 0; j < count2; j++)
+        {
+            print_parameter(ss, parameters[index]);
+            index++;
+
+            if (j != count2 - 1)
+            {
+                ss << ", ";
+            }
+            else
+            {
+                ss << "},";
+            }
+            if (j % 8 == 7)
+            {
+                ss << endl;
+            }
+        }
+    }
+    ss << "};\n\n";
+}
+
 void LuxEval::print_parameters(const parameters_t &parameters)
 {
     int index = 0;
     stringstream ss;
-    print_array(ss, parameters, index, "material", 6);
+    parameters_t copy = parameters;
 
-    print_array_2d(ss, parameters, index, "pst", 6, 64);
+    print_array(ss, copy, index, "material", 6);
 
-    print_single(ss, parameters, index, "bishop_pair");
-    print_single(ss, parameters, index, "open_file");
-    print_single(ss, parameters, index, "semi_open_file");
+    print_pst(ss, copy, index, "pst", 6, 64);
+
+    print_single(ss, copy, index, "bishop_pair");
+    print_single(ss, copy, index, "open_file");
+    print_single(ss, copy, index, "semi_open_file");
 
     cout << ss.str() << "\n";
 }
