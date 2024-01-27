@@ -12,7 +12,7 @@ using TuneEval = Lux::LuxEval;
 
 constexpr int32_t data_load_thread_count = 4;
 constexpr int32_t thread_count = 4;
-constexpr tune_t preferred_k = 3.4717;
+constexpr tune_t preferred_k = 3.56494;
 constexpr int32_t max_epoch = 5001;
 constexpr bool retune_from_zero = true;
 constexpr bool enable_qsearch = false;
