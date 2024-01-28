@@ -13,12 +13,14 @@ using namespace std;
 struct EvalInfo {
     int gamephase = 0;
     int score     = 0;
+    double scale  = 0;
 
     Bitboard pawn[2];
 };
 
 struct Trace {
     int score = 0;
+    tune_t endgame_scale;
 
     int material[6][2]{};
     int pst[6][64][2]{};
@@ -183,6 +185,11 @@ void eval_pieces(EvalInfo &info, const Board &board, Trace &trace) {
     info.score -= eval_piece<Color::BLACK, PieceType::KING>(info, board, trace);
 }
 
+double endgame_scale(EvalInfo &info) {
+    int num_missing_stronger_pawns = 8 - builtin::popcount(info.pawn[info.score < 0]);
+    return (128 - num_missing_stronger_pawns * num_missing_stronger_pawns) / 128.0;
+}
+
 int evaluate(const Board &board, Trace &trace) {
     // Check for draw by insufficient material
     if (board.isInsufficientMaterial()) return 0;
@@ -192,8 +199,12 @@ int evaluate(const Board &board, Trace &trace) {
     eval_pieces(info, board, trace);
 
     info.gamephase = std::min(info.gamephase, 24);
+    info.scale     = endgame_scale(info);
 
-    int score = (mg_score(info.score) * info.gamephase + eg_score(info.score) * (24 - info.gamephase)) / 24;
+    trace.endgame_scale = info.scale;
+
+    int score =
+        (mg_score(info.score) * info.gamephase + eg_score(info.score) * (24 - info.gamephase) * info.scale) / 24;
 
     return (board.sideToMove() == Color::WHITE ? score : -score);
 }
@@ -248,16 +259,18 @@ EvalResult LuxEval::get_fen_eval_result(const std::string &fen) {
 
     const auto trace = eval(board);
     EvalResult result;
-    result.coefficients = get_coefficients(trace);
-    result.score        = trace.score;
+    result.coefficients  = get_coefficients(trace);
+    result.score         = trace.score;
+    result.endgame_scale = trace.endgame_scale;
     return result;
 }
 
 EvalResult LuxEval::get_external_eval_result(const chess::Board &board) {
     const auto trace = eval(board);
     EvalResult result;
-    result.coefficients = get_coefficients(trace);
-    result.score        = trace.score;
+    result.coefficients  = get_coefficients(trace);
+    result.score         = trace.score;
+    result.endgame_scale = trace.endgame_scale;
     return result;
 }
 
@@ -321,18 +334,19 @@ static void print_pst(std::stringstream &ss, parameters_t &parameters, int &inde
                       int count2) {
     // Normalize PST
     for (auto i = 0; i < count1; i++) {
-        int sum = 0;
+        int sum0 = 0, sum1 = 0;
         for (auto j = 0; j < count2; j++) {
             if (i == 0 && (j < 8 || j >= 56)) continue;
 
-            sum += parameters[index + count2 * i + j][0] + parameters[index + count2 * i + j][1];
+            sum0 += parameters[index + count2 * i + j][0];
+            sum1 += parameters[index + count2 * i + j][1];
         }
 
         for (auto j = 0; j < count2; j++) {
             if (i == 0 && (j < 8 || j >= 56)) continue;
 
-            parameters[index + count2 * i + j][0] -= sum / count2 / 2;
-            parameters[index + count2 * i + j][1] -= sum / count2 / 2;
+            parameters[index + count2 * i + j][0] -= sum0 / count2;
+            parameters[index + count2 * i + j][1] -= sum1 / count2;
         }
     }
 
