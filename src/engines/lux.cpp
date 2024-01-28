@@ -199,8 +199,6 @@ int evaluate(const Board &board, Trace &trace) {
 }
 
 Trace eval(const Board &board) {
-    init_eval_tables();
-
     Trace trace{};
 
     int score = evaluate(board, trace);
@@ -215,6 +213,8 @@ Trace eval(const Board &board) {
 // ---------------------------------------------------------------------------------------------------------------------
 
 parameters_t LuxEval::get_initial_parameters() {
+    init_eval_tables();
+
     parameters_t parameters;
 
     get_initial_parameter_array(parameters, material, 6);
