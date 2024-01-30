@@ -28,6 +28,8 @@ struct Trace {
     int bishop_pair[2]{};
     int open_file[6][2]{};
     int semi_open_file[6][2]{};
+
+    int mobility[5][28][2]{};
 };
 
 int phase_values[6] = {0, 1, 1, 2, 4, 0};
@@ -96,6 +98,24 @@ const int bishop_pair = S(33, 110);
 const int open_file[6]      = {S(0, 0), S(0, 0), S(0, 0), S(28, 31), S(0, 0), S(0, 0)};
 const int semi_open_file[6] = {S(0, 0), S(0, 0), S(0, 0), S(17, 15), S(0, 0), S(0, 0)};
 
+const int mobility[5][28] = {
+    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
+    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
+    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
+    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
+    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
+};
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Evaluation
 // ---------------------------------------------------------------------------------------------------------------------
@@ -156,6 +176,20 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
                 }
             }
         }
+
+        Bitboard moves = 0;
+
+        if (p == PieceType::KNIGHT)
+            moves = attacks::knight(sq);
+        else if (p == PieceType::BISHOP)
+            moves = attacks::bishop(sq, board.occ());
+        else if (p == PieceType::ROOK)
+            moves = attacks::rook(sq, board.occ());
+        else if (p == PieceType::QUEEN || p == PieceType::KING)
+            moves = attacks::queen(sq, board.occ());
+
+        score += mobility[(int)p - 1][builtin::popcount(moves & ~board.us(c))];
+        TraceIncr(mobility[(int)p - 1][builtin::popcount(moves & ~board.us(c))]);
 
         if (c == Color::WHITE) sq = sq ^ 56;
 
@@ -236,6 +270,8 @@ parameters_t LuxEval::get_initial_parameters() {
     get_initial_parameter_array(parameters, open_file, 6);
     get_initial_parameter_array(parameters, semi_open_file, 6);
 
+    get_initial_parameter_array_2d(parameters, mobility, 5, 28);
+
     return parameters;
 }
 
@@ -249,6 +285,8 @@ static coefficients_t get_coefficients(const Trace &trace) {
     get_coefficient_single(coefficients, trace.bishop_pair);
     get_coefficient_array(coefficients, trace.open_file, 6);
     get_coefficient_array(coefficients, trace.semi_open_file, 6);
+
+    get_coefficient_array_2d(coefficients, trace.mobility, 5, 28);
 
     return coefficients;
 }
@@ -330,26 +368,8 @@ static void print_array_2d(std::stringstream &ss, const parameters_t &parameters
     ss << "};\n";
 }
 
-static void print_pst(std::stringstream &ss, parameters_t &parameters, int &index, const std::string &name, int count1,
-                      int count2) {
-    // Normalize PST
-    for (auto i = 0; i < count1; i++) {
-        int sum0 = 0, sum1 = 0;
-        for (auto j = 0; j < count2; j++) {
-            if (i == 0 && (j < 8 || j >= 56)) continue;
-
-            sum0 += parameters[index + count2 * i + j][0];
-            sum1 += parameters[index + count2 * i + j][1];
-        }
-
-        for (auto j = 0; j < count2; j++) {
-            if (i == 0 && (j < 8 || j >= 56)) continue;
-
-            parameters[index + count2 * i + j][0] -= sum0 / count2;
-            parameters[index + count2 * i + j][1] -= sum1 / count2;
-        }
-    }
-
+static void print_pst(std::stringstream &ss, const parameters_t &parameters, int &index, const std::string &name,
+                      int count1, int count2) {
     string names[6] = {"Pawn", "Knight", "Bishop", "Rook", "Queen", "King"};
 
     ss << "int " << name << "[" << count1 << "][" << count2 << "] = {\n";
@@ -374,6 +394,29 @@ static void print_pst(std::stringstream &ss, parameters_t &parameters, int &inde
     ss << "};\n";
 }
 
+static void normalize_2d(parameters_t &parameters, int &index, int count1, int count2) {
+    for (auto i = 0; i < count1; i++) {
+        int sum0 = 0, sum1 = 0, cnt0 = 0, cnt1 = 0;
+
+        for (auto j = 0; j < count2; j++) {
+            if (parameters[index + count2 * i + j][0] != 0 && parameters[index + count2 * i + j][1] != 0) {
+                sum0 += parameters[index + count2 * i + j][0];
+                cnt0++;
+
+                sum1 += parameters[index + count2 * i + j][1];
+                cnt1++;
+            }
+        }
+
+        for (auto j = 0; j < count2; j++) {
+            if (parameters[index + count2 * i + j][0] != 0 && parameters[index + count2 * i + j][1] != 0) {
+                parameters[index + count2 * i + j][0] -= sum0 / cnt0;
+                parameters[index + count2 * i + j][1] -= sum1 / cnt1;
+            }
+        }
+    }
+}
+
 void LuxEval::print_parameters(const parameters_t &parameters) {
     int index = 0;
     stringstream ss;
@@ -382,6 +425,7 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
     print_array(ss, copy, index, "material", 6);
     ss << endl;
 
+    // normalize_2d(copy, index, 6, 64);
     print_pst(ss, copy, index, "pst", 6, 64);
     ss << endl;
 
@@ -390,6 +434,10 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
 
     print_array(ss, copy, index, "open_file", 6);
     print_array(ss, copy, index, "semi_open_file", 6);
+    ss << endl;
+
+    // normalize_2d(copy, index, 5, 28);
+    print_array_2d(ss, copy, index, "mobility", 5, 28);
 
     cout << ss.str() << "\n";
 }
