@@ -178,7 +178,6 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
         }
 
         Bitboard moves = 0;
-
         if (p == PieceType::KNIGHT)
             moves = attacks::knight(sq);
         else if (p == PieceType::BISHOP)
@@ -394,7 +393,7 @@ static void print_pst(std::stringstream &ss, const parameters_t &parameters, int
     ss << "};\n";
 }
 
-static void normalize_2d(parameters_t &parameters, int &index, int count1, int count2) {
+static void normalize_2d(parameters_t &parameters, int &index, int count1, int count2, int offset) {
     for (auto i = 0; i < count1; i++) {
         int sum0 = 0, sum1 = 0, cnt0 = 0, cnt1 = 0;
 
@@ -406,6 +405,11 @@ static void normalize_2d(parameters_t &parameters, int &index, int count1, int c
                 sum1 += parameters[index + count2 * i + j][1];
                 cnt1++;
             }
+        }
+
+        if (i + offset < 5) {
+            if (cnt0 > 0) parameters[i + offset][0] += sum0 / cnt0;
+            if (cnt1 > 0) parameters[i + offset][1] += sum1 / cnt1;
         }
 
         for (auto j = 0; j < count2; j++) {
@@ -422,10 +426,13 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
     stringstream ss;
     parameters_t copy = parameters;
 
+    int pst_index_offset = 6, mobility_index_offset = 6 + 6 * 64 + 1 + 6 + 6;
+    normalize_2d(copy, pst_index_offset, 6, 64, 0);
+    normalize_2d(copy, mobility_index_offset, 5, 28, 1);
+
     print_array(ss, copy, index, "material", 6);
     ss << endl;
 
-    // normalize_2d(copy, index, 6, 64);
     print_pst(ss, copy, index, "pst", 6, 64);
     ss << endl;
 
@@ -436,7 +443,6 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
     print_array(ss, copy, index, "semi_open_file", 6);
     ss << endl;
 
-    // normalize_2d(copy, index, 5, 28);
     print_array_2d(ss, copy, index, "mobility", 5, 28);
 
     cout << ss.str() << "\n";
