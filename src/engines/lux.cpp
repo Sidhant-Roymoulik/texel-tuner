@@ -27,11 +27,11 @@ struct Trace {
     int pst[6][64][2]{};
     int mobility[5][28][2]{};
 
-    int open_file[6][2]{};
-    int semi_open_file[6][2]{};
+    int open_file[3][2]{};
+    int semi_open_file[3][2]{};
+    int attacked_by_pawn[2][2]{};
 
     int bishop_pair[2]{};
-    int attacked_by_pawn[2]{};
 };
 
 int phase_values[6] = {0, 1, 1, 2, 4, 0};
@@ -94,12 +94,6 @@ int pst[6][64] = {
      S(5, -38),    S(9, -13),   S(-41, 16),  S(-101, 28), S(-77, 28),  S(-54, 19), S(2, -4),   S(11, -27),
      S(-21, -67),  S(43, -50),  S(12, -27),  S(-95, 2),   S(-14, -21), S(-50, -5), S(30, -38), S(19, -64)},
 };
-
-const int bishop_pair = S(33, 110);
-
-const int open_file[6]      = {S(0, 0), S(0, 0), S(0, 0), S(28, 31), S(0, 0), S(0, 0)};
-const int semi_open_file[6] = {S(0, 0), S(0, 0), S(0, 0), S(17, 15), S(0, 0), S(0, 0)};
-
 const int mobility[5][28] = {
     {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
      S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
@@ -118,7 +112,11 @@ const int mobility[5][28] = {
      S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
 };
 
-const int attacked_by_pawn = S(0, 0);
+const int open_file[6]        = {S(28, 31), S(0, 0), S(0, 0)};
+const int semi_open_file[6]   = {S(17, 15), S(0, 0), S(0, 0)};
+const int attacked_by_pawn[2] = {S(0, 0), S(0, 0)};
+
+const int bishop_pair = S(33, 110);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Evaluation
@@ -136,13 +134,13 @@ void init_eval_tables() {
 
 template <Color c>
 int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
-    int score      = 0;
-    Bitboard pawns = board.pieces(PieceType::PAWN, c);
+    int score   = 0;
+    Bitboard bb = board.pieces(PieceType::PAWN, c);
 
-    info.pawn[(int)c] = pawns;
+    info.pawn[(int)c] = bb;
 
-    while (pawns) {
-        Square sq = builtin::poplsb(pawns);
+    while (bb) {
+        Square sq = builtin::poplsb(bb);
 
         if (c == Color::WHITE) sq = sq ^ 56;
 
@@ -156,39 +154,39 @@ int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
 
 template <Color c, PieceType p>
 int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
-    int score     = 0;
-    Bitboard copy = board.pieces(p, c);
-    info.gamephase += phase_values[(int)p] * builtin::popcount(copy);
+    int score   = 0;
+    Bitboard bb = board.pieces(p, c);
+    info.gamephase += phase_values[(int)p] * builtin::popcount(bb);
 
     const Direction UP_EAST = c == Color::BLACK ? Direction::NORTH_EAST : Direction::SOUTH_EAST;
     const Direction UP_WEST = c == Color::BLACK ? Direction::NORTH_WEST : Direction::SOUTH_WEST;
 
     Bitboard pawn_attacks = attacks::shift<UP_EAST>(info.pawn[(int)~c]) | attacks::shift<UP_WEST>(info.pawn[(int)~c]);
 
-    if (p == PieceType::BISHOP && (copy & (copy - 1))) {
+    if (p == PieceType::BISHOP && (bb & (bb - 1))) {
         score += bishop_pair;
         TraceIncr(bishop_pair);
     }
 
-    while (copy) {
-        Square sq = builtin::poplsb(copy);
+    while (bb) {
+        Square sq = builtin::poplsb(bb);
 
         if ((int)p >= 3) {
             Bitboard file = attacks::MASK_FILE[(int)utils::squareFile(sq)];
             if (!(file & info.pawn[(int)c])) {
                 if (!(file & info.pawn[(int)~c])) {
-                    score += open_file[(int)p];
-                    TraceIncr(open_file[(int)p]);
+                    score += open_file[(int)p - 3];
+                    TraceIncr(open_file[(int)p - 3]);
                 } else {
-                    score += semi_open_file[(int)p];
-                    TraceIncr(semi_open_file[(int)p]);
+                    score += semi_open_file[(int)p - 3];
+                    TraceIncr(semi_open_file[(int)p - 3]);
                 }
             }
         }
 
         if (pawn_attacks & (1ULL << sq)) {
-            score += attacked_by_pawn;
-            TraceIncr(attacked_by_pawn);
+            score += attacked_by_pawn[c == board.sideToMove()];
+            TraceIncr(attacked_by_pawn[c == board.sideToMove()]);
         }
 
         Bitboard moves = 0;
@@ -233,8 +231,8 @@ void eval_pieces(EvalInfo &info, const Board &board, Trace &trace) {
 }
 
 double endgame_scale(EvalInfo &info) {
-    int num_missing_stronger_pawns = 8 - builtin::popcount(info.pawn[info.score < 0]);
-    return (128 - num_missing_stronger_pawns * num_missing_stronger_pawns) / 128.0;
+    int num_missing_stronger_bb = 8 - builtin::popcount(info.pawn[info.score < 0]);
+    return (128 - num_missing_stronger_bb * num_missing_stronger_bb) / 128.0;
 }
 
 int evaluate(const Board &board, Trace &trace) {
@@ -280,11 +278,11 @@ parameters_t LuxEval::get_initial_parameters() {
     get_initial_parameter_array_2d(parameters, pst, 6, 64);
     get_initial_parameter_array_2d(parameters, mobility, 5, 28);
 
-    get_initial_parameter_array(parameters, open_file, 6);
-    get_initial_parameter_array(parameters, semi_open_file, 6);
+    get_initial_parameter_array(parameters, open_file, 3);
+    get_initial_parameter_array(parameters, semi_open_file, 3);
+    get_initial_parameter_array(parameters, attacked_by_pawn, 2);
 
     get_initial_parameter_single(parameters, bishop_pair);
-    get_initial_parameter_single(parameters, attacked_by_pawn);
 
     return parameters;
 }
@@ -297,11 +295,11 @@ static coefficients_t get_coefficients(const Trace &trace) {
     get_coefficient_array_2d(coefficients, trace.pst, 6, 64);
     get_coefficient_array_2d(coefficients, trace.mobility, 5, 28);
 
-    get_coefficient_array(coefficients, trace.open_file, 6);
-    get_coefficient_array(coefficients, trace.semi_open_file, 6);
+    get_coefficient_array(coefficients, trace.open_file, 3);
+    get_coefficient_array(coefficients, trace.semi_open_file, 3);
+    get_coefficient_array(coefficients, trace.attacked_by_pawn, 2);
 
     get_coefficient_single(coefficients, trace.bishop_pair);
-    get_coefficient_single(coefficients, trace.attacked_by_pawn);
 
     return coefficients;
 }
@@ -440,25 +438,25 @@ static void normalize_2d(parameters_t &parameters, int &index, int count1, int c
 void LuxEval::print_parameters(const parameters_t &parameters) {
     int index = 0;
     stringstream ss;
-    parameters_t copy = parameters;
+    parameters_t bb = parameters;
 
     int pst_index_offset = 6, mobility_index_offset = 6 + 6 * 64;
-    normalize_2d(copy, pst_index_offset, 6, 64, 0);
-    normalize_2d(copy, mobility_index_offset, 5, 28, 1);
+    normalize_2d(bb, pst_index_offset, 6, 64, 0);
+    normalize_2d(bb, mobility_index_offset, 5, 28, 1);
 
-    print_array(ss, copy, index, "material", 6);
+    print_array(ss, bb, index, "material", 6);
     ss << endl;
 
-    print_pst(ss, copy, index, "pst", 6, 64);
-    print_array_2d(ss, copy, index, "mobility", 5, 28);
+    print_pst(ss, bb, index, "pst", 6, 64);
+    print_array_2d(ss, bb, index, "mobility", 5, 28);
     ss << endl;
 
-    print_array(ss, copy, index, "open_file", 6);
-    print_array(ss, copy, index, "semi_open_file", 6);
+    print_array(ss, bb, index, "open_file", 3);
+    print_array(ss, bb, index, "semi_open_file", 3);
+    print_array(ss, bb, index, "attacked_by_pawn", 2);
     ss << endl;
 
-    print_single(ss, copy, index, "bishop_pair");
-    print_single(ss, copy, index, "attacked_by_pawn");
+    print_single(ss, bb, index, "bishop_pair");
     ss << endl;
 
     cout << ss.str() << "\n";
