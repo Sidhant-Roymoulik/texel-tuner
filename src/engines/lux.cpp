@@ -34,6 +34,7 @@ struct Trace {
 
     int bishop_pair[2]{};
     int doubled_pawn[2]{};
+    int tempo[2]{};
 };
 
 int phase_values[6] = {0, 1, 1, 2, 4, 0};
@@ -109,6 +110,7 @@ const int protected_by_pawn[6] = {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S
 
 const int bishop_pair  = S(0, 0);
 const int doubled_pawn = S(0, 0);
+const int tempo        = S(0, 0);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Evaluation
@@ -259,6 +261,10 @@ int evaluate(const Board &board, Trace &trace) {
 
     EvalInfo info;
 
+    info.score = (board.sideToMove() == Color::WHITE ? tempo : -tempo);
+    Color c    = board.sideToMove();
+    TraceIncr(tempo);
+
     eval_pieces(info, board, trace);
 
     info.gamephase = std::min(info.gamephase, 24);
@@ -303,6 +309,7 @@ parameters_t LuxEval::get_initial_parameters() {
 
     get_initial_parameter_single(parameters, bishop_pair);
     get_initial_parameter_single(parameters, doubled_pawn);
+    get_initial_parameter_single(parameters, tempo);
 
     return parameters;
 }
@@ -322,6 +329,7 @@ static coefficients_t get_coefficients(const Trace &trace) {
 
     get_coefficient_single(coefficients, trace.bishop_pair);
     get_coefficient_single(coefficients, trace.doubled_pawn);
+    get_coefficient_single(coefficients, trace.tempo);
 
     return coefficients;
 }
@@ -481,6 +489,7 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
 
     print_single(ss, bb, index, "bishop_pair");
     print_single(ss, bb, index, "doubled_pawn");
+    print_single(ss, bb, index, "tempo");
     ss << endl;
 
     cout << ss.str() << "\n";

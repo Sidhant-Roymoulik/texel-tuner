@@ -330,6 +330,7 @@ static int32_t get_piece_value(const chess::Piece piece)
         return 0;
         // throw std::runtime_error("Invalid piece for value");
     }
+    return 0;
 }
 
 static int32_t mvv_lva(const chess::Board &board, const chess::Move move)
