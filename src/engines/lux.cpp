@@ -37,8 +37,6 @@ struct Trace {
     int tempo[2]{};
 };
 
-enum { Pawn, Knight, Bishop, Rook, Queen, King, None };
-
 int phase_values[6] = {0, 1, 1, 2, 4, 0};
 
 const int material[6] = {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)};
@@ -122,13 +120,14 @@ const int tempo        = S(0, 0);
 #define TraceAdd(parameter, count) trace.parameter[(int)c] += count
 
 void init_eval_tables() {
-    for (int i = Pawn; i <= King; i++) {
+    for (int i = (int)PieceType::PAWN; i <= (int)PieceType::KING; i++) {
         for (int j = Square::SQ_A1; j <= Square::SQ_H8; j++) {
             pst[i][j] += material[i];
         }
     }
 }
 
+// Get a bitboard with all pawn attacks based on pawn location and movement direction
 template <Direction D>
 Bitboard get_pawn_attacks(Bitboard &pawns) {
     Bitboard shifted = attacks::shift<D>(pawns);
@@ -138,14 +137,18 @@ Bitboard get_pawn_attacks(Bitboard &pawns) {
 template <Color c>
 int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
     int score   = 0;
-    Bitboard bb = board.pieces(PieceType(Pawn), c);
+    Bitboard bb = board.pieces(PieceType::PAWN, c);
 
+    // Add pawn bb to eval info
     info.pawn[(int)c] = bb;
 
+    // Init useful directions
     const Direction UP = c == Color::WHITE ? Direction::NORTH : Direction::SOUTH;
 
+    // Init friendly pawn attacks
     Bitboard pawn_protection = get_pawn_attacks<UP>(bb);
 
+    // Penalty for doubled pawns
     score +=
         doubled_pawn * builtin::popcount(bb & (attacks::shift<UP>(bb) | attacks::shift<UP>(attacks::shift<UP>(bb))));
     TraceAdd(doubled_pawn,
@@ -154,6 +157,7 @@ int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
     while (bb) {
         Square sq = builtin::poplsb(bb);
 
+        // Bonus if pawn is protected by pawn
         if (pawn_protection & (1ULL << sq)) {
             score += protected_by_pawn[0];
             TraceIncr(protected_by_pawn[0]);
@@ -161,27 +165,30 @@ int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
 
         if (c == Color::WHITE) sq = sq ^ 56;
 
-        score += pst[Pawn][sq];
-        TraceIncr(pst[Pawn][sq]);
-        TraceIncr(material[Pawn]);
+        score += pst[(int)PieceType::PAWN][sq];
+        TraceIncr(pst[(int)PieceType::PAWN][sq]);
+        TraceIncr(material[(int)PieceType::PAWN]);
     }
 
     return score;
 }
 
-template <Color c, int p>
+template <Color c, PieceType p>
 int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
     int score   = 0;
-    Bitboard bb = board.pieces(PieceType(p), c);
-    info.gamephase += phase_values[p] * builtin::popcount(bb);
+    Bitboard bb = board.pieces(p, c);
+    info.gamephase += phase_values[(int)p] * builtin::popcount(bb);
 
+    // Init useful directions
     const Direction UP   = c == Color::WHITE ? Direction::NORTH : Direction::SOUTH;
     const Direction DOWN = c == Color::BLACK ? Direction::NORTH : Direction::SOUTH;
 
+    // Init friendly and enemy pawn attacks
     Bitboard pawn_protection = get_pawn_attacks<UP>(info.pawn[(int)c]);
     Bitboard pawn_attacks    = get_pawn_attacks<DOWN>(info.pawn[(int)~c]);
 
-    if (p == Bishop && (bb & (bb - 1))) {
+    // Bishop pair bonus
+    if (p == PieceType::BISHOP && (bb & (bb - 1))) {
         score += bishop_pair;
         TraceIncr(bishop_pair);
     }
@@ -189,46 +196,52 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
     while (bb) {
         Square sq = builtin::poplsb(bb);
 
-        if (p >= 3) {
+        // Open and Semi-Open file bonus
+        if ((int)p >= 3) {
             Bitboard file = attacks::MASK_FILE[(int)utils::squareFile(sq)];
             if (!(file & info.pawn[(int)c])) {
                 if (!(file & info.pawn[(int)~c])) {
-                    score += open_file[p - 3];
-                    TraceIncr(open_file[p - 3]);
+                    score += open_file[(int)p - 3];
+                    TraceIncr(open_file[(int)p - 3]);
                 } else {
-                    score += semi_open_file[p - 3];
-                    TraceIncr(semi_open_file[p - 3]);
+                    score += semi_open_file[(int)p - 3];
+                    TraceIncr(semi_open_file[(int)p - 3]);
                 }
             }
         }
 
+        // Bonus if piece is protected by pawn
         if (pawn_protection & (1ULL << sq)) {
-            score += protected_by_pawn[p];
-            TraceIncr(protected_by_pawn[p]);
+            score += protected_by_pawn[(int)p];
+            TraceIncr(protected_by_pawn[(int)p]);
         }
+
+        // Penalty is piece is attacked by pawn
         if (pawn_attacks & (1ULL << sq)) {
             score += attacked_by_pawn[c == board.sideToMove()];
             TraceIncr(attacked_by_pawn[c == board.sideToMove()]);
         }
 
+        // Get move bb for piece
         Bitboard moves = 0;
-        if (p == Knight)
+        if (p == PieceType::KNIGHT)
             moves = attacks::knight(sq);
-        else if (p == Bishop)
+        else if (p == PieceType::BISHOP)
             moves = attacks::bishop(sq, board.occ());
-        else if (p == Rook)
+        else if (p == PieceType::ROOK)
             moves = attacks::rook(sq, board.occ());
-        else if (p == Queen || p == King)
+        else if (p == PieceType::QUEEN || p == PieceType::KING)
             moves = attacks::queen(sq, board.occ());
 
-        score += mobility[p - 1][builtin::popcount(moves & ~board.us(c) & ~pawn_attacks)];
-        TraceIncr(mobility[p - 1][builtin::popcount(moves & ~board.us(c) & ~pawn_attacks)]);
+        // Bonus/penalty for number of moves per piece
+        score += mobility[(int)p - 1][builtin::popcount(moves & ~board.us(c) & ~pawn_attacks)];
+        TraceIncr(mobility[(int)p - 1][builtin::popcount(moves & ~board.us(c) & ~pawn_attacks)]);
 
         if (c == Color::WHITE) sq = sq ^ 56;
 
-        score += pst[p][sq];
-        TraceIncr(pst[p][sq]);
-        TraceIncr(material[p]);
+        score += pst[(int)p][sq];
+        TraceIncr(pst[(int)p][sq]);
+        TraceIncr(material[(int)p]);
     }
 
     return score;
@@ -238,23 +251,24 @@ void eval_pieces(EvalInfo &info, const Board &board, Trace &trace) {
     info.score += eval_pawn<Color::WHITE>(info, board, trace);
     info.score -= eval_pawn<Color::BLACK>(info, board, trace);
 
-    info.score += eval_piece<Color::WHITE, Knight>(info, board, trace);
-    info.score += eval_piece<Color::WHITE, Bishop>(info, board, trace);
-    info.score += eval_piece<Color::WHITE, Rook>(info, board, trace);
-    info.score += eval_piece<Color::WHITE, Queen>(info, board, trace);
+    info.score += eval_piece<Color::WHITE, PieceType::KNIGHT>(info, board, trace);
+    info.score += eval_piece<Color::WHITE, PieceType::BISHOP>(info, board, trace);
+    info.score += eval_piece<Color::WHITE, PieceType::ROOK>(info, board, trace);
+    info.score += eval_piece<Color::WHITE, PieceType::QUEEN>(info, board, trace);
 
-    info.score -= eval_piece<Color::BLACK, Knight>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, Bishop>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, Rook>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, Queen>(info, board, trace);
+    info.score -= eval_piece<Color::BLACK, PieceType::KNIGHT>(info, board, trace);
+    info.score -= eval_piece<Color::BLACK, PieceType::BISHOP>(info, board, trace);
+    info.score -= eval_piece<Color::BLACK, PieceType::ROOK>(info, board, trace);
+    info.score -= eval_piece<Color::BLACK, PieceType::QUEEN>(info, board, trace);
 
-    info.score += eval_piece<Color::WHITE, King>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, King>(info, board, trace);
+    info.score += eval_piece<Color::WHITE, PieceType::KING>(info, board, trace);
+    info.score -= eval_piece<Color::BLACK, PieceType::KING>(info, board, trace);
 }
 
 double endgame_scale(EvalInfo &info) {
-    int num_missing_stronger_bb = 8 - builtin::popcount(info.pawn[info.score < 0]);
-    return (128 - num_missing_stronger_bb * num_missing_stronger_bb) / 128.0;
+    // Divide the endgame score if the stronger side doesn't have many pawns left
+    int num_missing_stronger_pawns = 8 - builtin::popcount(info.pawn[info.score < 0]);
+    return (128 - num_missing_stronger_pawns * num_missing_stronger_pawns) / 128.0;
 }
 
 int evaluate(const Board &board, Trace &trace) {
