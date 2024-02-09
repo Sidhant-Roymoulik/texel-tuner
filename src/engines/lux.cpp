@@ -37,6 +37,8 @@ struct Trace {
     int tempo[2]{};
 };
 
+enum { Pawn, Knight, Bishop, Rook, Queen, King, None };
+
 int phase_values[6] = {0, 1, 1, 2, 4, 0};
 
 const int material[6] = {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)};
@@ -120,7 +122,7 @@ const int tempo        = S(0, 0);
 #define TraceAdd(parameter, count) trace.parameter[(int)c] += count
 
 void init_eval_tables() {
-    for (int i = (int)PieceType::PAWN; i <= (int)PieceType::KING; i++) {
+    for (int i = Pawn; i <= King; i++) {
         for (int j = Square::SQ_A1; j <= Square::SQ_H8; j++) {
             pst[i][j] += material[i];
         }
@@ -136,7 +138,7 @@ Bitboard get_pawn_attacks(Bitboard &pawns) {
 template <Color c>
 int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
     int score   = 0;
-    Bitboard bb = board.pieces(PieceType::PAWN, c);
+    Bitboard bb = board.pieces(PieceType(Pawn), c);
 
     info.pawn[(int)c] = bb;
 
@@ -159,19 +161,19 @@ int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
 
         if (c == Color::WHITE) sq = sq ^ 56;
 
-        score += pst[(int)PieceType::PAWN][sq];
-        TraceIncr(pst[(int)PieceType::PAWN][sq]);
-        TraceIncr(material[(int)PieceType::PAWN]);
+        score += pst[Pawn][sq];
+        TraceIncr(pst[Pawn][sq]);
+        TraceIncr(material[Pawn]);
     }
 
     return score;
 }
 
-template <Color c, PieceType p>
+template <Color c, int p>
 int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
     int score   = 0;
-    Bitboard bb = board.pieces(p, c);
-    info.gamephase += phase_values[(int)p] * builtin::popcount(bb);
+    Bitboard bb = board.pieces(PieceType(p), c);
+    info.gamephase += phase_values[p] * builtin::popcount(bb);
 
     const Direction UP   = c == Color::WHITE ? Direction::NORTH : Direction::SOUTH;
     const Direction DOWN = c == Color::BLACK ? Direction::NORTH : Direction::SOUTH;
@@ -179,7 +181,7 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
     Bitboard pawn_protection = get_pawn_attacks<UP>(info.pawn[(int)c]);
     Bitboard pawn_attacks    = get_pawn_attacks<DOWN>(info.pawn[(int)~c]);
 
-    if (p == PieceType::BISHOP && (bb & (bb - 1))) {
+    if (p == Bishop && (bb & (bb - 1))) {
         score += bishop_pair;
         TraceIncr(bishop_pair);
     }
@@ -187,22 +189,22 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
     while (bb) {
         Square sq = builtin::poplsb(bb);
 
-        if ((int)p >= 3) {
+        if (p >= 3) {
             Bitboard file = attacks::MASK_FILE[(int)utils::squareFile(sq)];
             if (!(file & info.pawn[(int)c])) {
                 if (!(file & info.pawn[(int)~c])) {
-                    score += open_file[(int)p - 3];
-                    TraceIncr(open_file[(int)p - 3]);
+                    score += open_file[p - 3];
+                    TraceIncr(open_file[p - 3]);
                 } else {
-                    score += semi_open_file[(int)p - 3];
-                    TraceIncr(semi_open_file[(int)p - 3]);
+                    score += semi_open_file[p - 3];
+                    TraceIncr(semi_open_file[p - 3]);
                 }
             }
         }
 
         if (pawn_protection & (1ULL << sq)) {
-            score += protected_by_pawn[(int)p];
-            TraceIncr(protected_by_pawn[(int)p]);
+            score += protected_by_pawn[p];
+            TraceIncr(protected_by_pawn[p]);
         }
         if (pawn_attacks & (1ULL << sq)) {
             score += attacked_by_pawn[c == board.sideToMove()];
@@ -210,23 +212,23 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
         }
 
         Bitboard moves = 0;
-        if (p == PieceType::KNIGHT)
+        if (p == Knight)
             moves = attacks::knight(sq);
-        else if (p == PieceType::BISHOP)
+        else if (p == Bishop)
             moves = attacks::bishop(sq, board.occ());
-        else if (p == PieceType::ROOK)
+        else if (p == Rook)
             moves = attacks::rook(sq, board.occ());
-        else if (p == PieceType::QUEEN || p == PieceType::KING)
+        else if (p == Queen || p == King)
             moves = attacks::queen(sq, board.occ());
 
-        score += mobility[(int)p - 1][builtin::popcount(moves & ~board.us(c) & ~pawn_attacks)];
-        TraceIncr(mobility[(int)p - 1][builtin::popcount(moves & ~board.us(c) & ~pawn_attacks)]);
+        score += mobility[p - 1][builtin::popcount(moves & ~board.us(c) & ~pawn_attacks)];
+        TraceIncr(mobility[p - 1][builtin::popcount(moves & ~board.us(c) & ~pawn_attacks)]);
 
         if (c == Color::WHITE) sq = sq ^ 56;
 
-        score += pst[(int)p][sq];
-        TraceIncr(pst[(int)p][sq]);
-        TraceIncr(material[(int)p]);
+        score += pst[p][sq];
+        TraceIncr(pst[p][sq]);
+        TraceIncr(material[p]);
     }
 
     return score;
@@ -236,18 +238,18 @@ void eval_pieces(EvalInfo &info, const Board &board, Trace &trace) {
     info.score += eval_pawn<Color::WHITE>(info, board, trace);
     info.score -= eval_pawn<Color::BLACK>(info, board, trace);
 
-    info.score += eval_piece<Color::WHITE, PieceType::KNIGHT>(info, board, trace);
-    info.score += eval_piece<Color::WHITE, PieceType::BISHOP>(info, board, trace);
-    info.score += eval_piece<Color::WHITE, PieceType::ROOK>(info, board, trace);
-    info.score += eval_piece<Color::WHITE, PieceType::QUEEN>(info, board, trace);
+    info.score += eval_piece<Color::WHITE, Knight>(info, board, trace);
+    info.score += eval_piece<Color::WHITE, Bishop>(info, board, trace);
+    info.score += eval_piece<Color::WHITE, Rook>(info, board, trace);
+    info.score += eval_piece<Color::WHITE, Queen>(info, board, trace);
 
-    info.score -= eval_piece<Color::BLACK, PieceType::KNIGHT>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, PieceType::BISHOP>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, PieceType::ROOK>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, PieceType::QUEEN>(info, board, trace);
+    info.score -= eval_piece<Color::BLACK, Knight>(info, board, trace);
+    info.score -= eval_piece<Color::BLACK, Bishop>(info, board, trace);
+    info.score -= eval_piece<Color::BLACK, Rook>(info, board, trace);
+    info.score -= eval_piece<Color::BLACK, Queen>(info, board, trace);
 
-    info.score += eval_piece<Color::WHITE, PieceType::KING>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, PieceType::KING>(info, board, trace);
+    info.score += eval_piece<Color::WHITE, King>(info, board, trace);
+    info.score -= eval_piece<Color::BLACK, King>(info, board, trace);
 }
 
 double endgame_scale(EvalInfo &info) {
@@ -402,9 +404,7 @@ static void print_array_2d(std::stringstream &ss, const parameters_t &parameters
             print_parameter(ss, parameters[index]);
             index++;
 
-            if (j != count2 - 1) {
-                ss << ", ";
-            }
+            if (j != count2 - 1) ss << ", ";
         }
         ss << "},\n";
     }
