@@ -199,10 +199,10 @@ int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
         }
 
         // Bonus if pawn is passed
-        // if (!(passed_pawn_mask[(int)c][sq] & info.pawn[(int)~c])) {
-        //     score += passed_pawns[(int)utils::squareRank(white_relative_square<c>(sq))];
-        //     TraceIncr(passed_pawns[(int)utils::squareRank(white_relative_square<c>(sq))]);
-        // }
+        if (!(passed_pawn_mask[(int)c][sq] & info.pawn[(int)~c])) {
+            score += passed_pawns[(int)utils::squareRank(white_relative_square<c>(sq))];
+            TraceIncr(passed_pawns[(int)utils::squareRank(white_relative_square<c>(sq))]);
+        }
 
         score += pst[0][black_relative_square<c>(sq)];
         TraceIncr(pst[0][black_relative_square<c>(sq)]);

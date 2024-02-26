@@ -4,9 +4,9 @@
 
 out
 build
+data
 enc_temp_folder
 CMakeFiles
-data
 
 CMakeSettings.json
 CMakeCache.txt
