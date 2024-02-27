@@ -175,9 +175,8 @@ int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
     // Init useful directions
     const Direction UP = c == Color::WHITE ? Direction::NORTH : Direction::SOUTH;
 
-    // Init friendly pawn attacks
-    info.pawn_attacks[(int)c] = get_pawn_attacks<UP>(bb);
-    Bitboard pawn_phalanx     = bb & attacks::shift<Direction::WEST>(bb);
+    // Init useful bitboards
+    Bitboard pawn_phalanx = bb & attacks::shift<Direction::WEST>(bb);
 
     // Penalty for doubled pawns
     score +=
@@ -288,8 +287,10 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
 
 void eval_pieces(EvalInfo &info, const Board &board, Trace &trace) {
     // Add pawn bb to eval info
-    info.pawn[(int)Color::WHITE] = board.pieces(PieceType::PAWN, Color::WHITE);
-    info.pawn[(int)Color::BLACK] = board.pieces(PieceType::PAWN, Color::BLACK);
+    info.pawn[0]         = board.pieces(PieceType::PAWN, Color::WHITE);
+    info.pawn[1]         = board.pieces(PieceType::PAWN, Color::BLACK);
+    info.pawn_attacks[0] = get_pawn_attacks<Direction::NORTH>(info.pawn[0]);
+    info.pawn_attacks[1] = get_pawn_attacks<Direction::SOUTH>(info.pawn[1]);
 
     info.score += eval_pawn<Color::WHITE>(info, board, trace);
     info.score -= eval_pawn<Color::BLACK>(info, board, trace);
