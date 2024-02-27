@@ -28,6 +28,7 @@ struct Trace {
 
     int bishop_pair[2]{};
     int doubled_pawn[2]{};
+    int isolated_pawn[2]{};
 };
 
 struct EvalInfo {
@@ -112,8 +113,9 @@ const int open_file[3]         = {S(0, 0), S(0, 0), S(0, 0)};
 const int semi_open_file[3]    = {S(0, 0), S(0, 0), S(0, 0)};
 const int attacked_by_pawn[2]  = {S(0, 0), S(0, 0)};
 
-const int bishop_pair  = S(0, 0);
-const int doubled_pawn = S(0, 0);
+const int bishop_pair   = S(0, 0);
+const int doubled_pawn  = S(0, 0);
+const int isolated_pawn = S(0, 0);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Evaluation
@@ -122,7 +124,7 @@ const int doubled_pawn = S(0, 0);
 #define TraceIncr(parameter) trace.parameter[(int)c]++
 #define TraceAdd(parameter, count) trace.parameter[(int)c] += count
 
-Bitboard passed_pawn_mask[2][64];
+Bitboard passed_pawn_mask[2][64], isolated_pawn_mask[64];
 
 void init_eval_tables() {
     for (int i = (int)PieceType::PAWN; i <= (int)PieceType::KING; i++) {
@@ -133,6 +135,8 @@ void init_eval_tables() {
 
     for (int i = Square::SQ_A1; i <= Square::SQ_H8; i++) {
         Bitboard file = attacks::MASK_FILE[(int)utils::squareFile(Square(i))];
+
+        isolated_pawn_mask[i] = attacks::shift<Direction::EAST>(file) | attacks::shift<Direction::WEST>(file);
 
         passed_pawn_mask[0][i] = file | attacks::shift<Direction::EAST>(file) | attacks::shift<Direction::WEST>(file);
         passed_pawn_mask[1][i] = passed_pawn_mask[0][i];
@@ -202,6 +206,12 @@ int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
         if (!(passed_pawn_mask[(int)c][sq] & info.pawn[(int)~c])) {
             score += passed_pawns[(int)utils::squareRank(white_relative_square<c>(sq))];
             TraceIncr(passed_pawns[(int)utils::squareRank(white_relative_square<c>(sq))]);
+        }
+
+        // Penalty is pawn is isolated
+        if (!(isolated_pawn_mask[sq] & info.pawn[(int)c])) {
+            score += isolated_pawn;
+            TraceIncr(isolated_pawn);
         }
 
         score += pst[0][black_relative_square<c>(sq)];
@@ -356,6 +366,7 @@ parameters_t LuxEval::get_initial_parameters() {
 
     get_initial_parameter_single(parameters, bishop_pair);
     get_initial_parameter_single(parameters, doubled_pawn);
+    get_initial_parameter_single(parameters, isolated_pawn);
 
     return parameters;
 }
@@ -377,6 +388,7 @@ static coefficients_t get_coefficients(const Trace &trace) {
 
     get_coefficient_single(coefficients, trace.bishop_pair);
     get_coefficient_single(coefficients, trace.doubled_pawn);
+    get_coefficient_single(coefficients, trace.isolated_pawn);
 
     return coefficients;
 }
@@ -536,6 +548,7 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
 
     print_single(ss, bb, index, "bishop_pair");
     print_single(ss, bb, index, "doubled_pawn");
+    print_single(ss, bb, index, "isolated_pawn");
     ss << endl;
 
     cout << ss.str() << "\n";
