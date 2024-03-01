@@ -17,24 +17,26 @@ struct Trace {
     int material[6][2]{};
 
     int pst[6][64][2]{};
-    int mobility[5][28][2]{};
 
-    int passed_pawns[8][2]{};
-    int phalanx_pawns[8][2]{};
-    int protected_by_pawn[6][2]{};
-    int open_file[3][2]{};
-    int semi_open_file[3][2]{};
-    int attacked_by_pawn[2][2]{};
+    int pawn_passed[3][8][2]{};
+    int pawn_phalanx[8][2]{};
+    int pawn_doubled[2][2]{};
+    int pawn_isolated[2]{};
+    int pawn_support[2]{};
 
+    int mobility[4][28][2]{};
+    int attacked_by_pawn[6][2]{};
+    int open_file[2]{};
+    int semi_open_file[2]{};
     int bishop_pair[2]{};
-    int doubled_pawn[2]{};
-    int isolated_pawn[2]{};
+    int minor_behind_pawn[2]{};
+
+    int king_open[28][2]{};
+    int king_att_pawn[2]{};
 };
 
 struct EvalInfo {
     int gamephase = 0;
-    int score     = 0;
-    double scale  = 0;
 
     Bitboard pawn[2];
     Bitboard pawn_attacks[2];
@@ -42,89 +44,37 @@ struct EvalInfo {
 
 int phase_values[6] = {0, 1, 1, 2, 4, 0};
 
-const int material[6] = {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)};
+const int material[6] = {};
 
-int pst[6][64] = {
-    // Pawn PSTS
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-    // Knight PSTS
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-    // Bishop PSTS
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-    // Rook PSTS
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-    // Queen PSTS
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-    // King PSTS
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-};
-const int mobility[5][28] = {
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-    {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
-     S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)},
-};
+int pst[6][64] = {};
 
-const int passed_pawns[8]      = {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)};
-const int phalanx_pawns[8]     = {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)};
-const int protected_by_pawn[6] = {S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)};
-const int open_file[3]         = {S(0, 0), S(0, 0), S(0, 0)};
-const int semi_open_file[3]    = {S(0, 0), S(0, 0), S(0, 0)};
-const int attacked_by_pawn[2]  = {S(0, 0), S(0, 0)};
+// Pawn Eval
+const int pawn_passed[3][8] = {};
+const int pawn_phalanx[8]   = {};
+const int pawn_doubled[2]   = {};
+const int pawn_isolated     = S(0, 0);
+const int pawn_support      = S(0, 0);
 
-const int bishop_pair   = S(0, 0);
-const int doubled_pawn  = S(0, 0);
-const int isolated_pawn = S(0, 0);
+// Piece Eval
+const int mobility[4][28]     = {};
+const int attacked_by_pawn[6] = {};
+const int open_file           = S(0, 0);
+const int semi_open_file      = S(0, 0);
+const int bishop_pair         = S(0, 0);
+const int minor_behind_pawn   = S(0, 0);
+
+// King Eval
+const int king_open[28] = {};
+const int king_att_pawn = S(0, 0);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Evaluation
 // ---------------------------------------------------------------------------------------------------------------------
 
 #define TraceIncr(parameter) trace.parameter[(int)c]++
-#define TraceAdd(parameter, count) trace.parameter[(int)c] += count
+#define TraceAdd(parameter) trace.parameter[(int)c] += count
 
-Bitboard passed_pawn_mask[2][64], isolated_pawn_mask[64];
+Bitboard passed_pawn_mask[2][64], pawn_isolated_mask[64];
 
 void init_eval_tables() {
     for (int i = (int)PieceType::PAWN; i <= (int)PieceType::KING; i++) {
@@ -136,15 +86,15 @@ void init_eval_tables() {
     for (int i = Square::SQ_A1; i <= Square::SQ_H8; i++) {
         Bitboard file = attacks::MASK_FILE[(int)utils::squareFile(Square(i))];
 
-        isolated_pawn_mask[i] = attacks::shift<Direction::EAST>(file) | attacks::shift<Direction::WEST>(file);
+        pawn_isolated_mask[i] = attacks::shift<Direction::EAST>(file) | attacks::shift<Direction::WEST>(file);
 
         passed_pawn_mask[0][i] = file | attacks::shift<Direction::EAST>(file) | attacks::shift<Direction::WEST>(file);
         passed_pawn_mask[1][i] = passed_pawn_mask[0][i];
 
-        while (passed_pawn_mask[0][i] & (1 << i)) {
+        while (passed_pawn_mask[0][i] & (1ULL << i)) {
             passed_pawn_mask[0][i] = attacks::shift<Direction::NORTH>(passed_pawn_mask[0][i]);
         }
-        while (passed_pawn_mask[1][i] & (1 << i)) {
+        while (passed_pawn_mask[1][i] & (1ULL << i)) {
             passed_pawn_mask[1][i] = attacks::shift<Direction::SOUTH>(passed_pawn_mask[1][i]);
         }
     }
@@ -161,56 +111,59 @@ Square white_relative_square(Square &sq) {
 }
 
 // Get a bitboard with all pawn attacks based on pawn location and movement direction
-template <Direction D>
+template <Color c>
 Bitboard get_pawn_attacks(Bitboard &pawns) {
-    Bitboard shifted = attacks::shift<D>(pawns);
-    return attacks::shift<Direction::WEST>(shifted) | attacks::shift<Direction::EAST>(shifted);
+    return attacks::pawnLeftAttacks<c>(pawns) | attacks::pawnRightAttacks<c>(pawns);
 }
 
 template <Color c>
 int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
-    int score   = 0;
+    int score = 0, count = 0;
     Bitboard bb = board.pieces(PieceType::PAWN, c);
 
-    // Init useful directions
-    const Direction UP = c == Color::WHITE ? Direction::NORTH : Direction::SOUTH;
-
     // Init useful bitboards
-    Bitboard pawn_phalanx = bb & attacks::shift<Direction::WEST>(bb);
+    Bitboard phalanx_pawns    = bb & attacks::shift<Direction::WEST>(bb);
+    Bitboard pawn_attacks     = get_pawn_attacks<c>(bb);
+    info.pawn_attacks[(int)c] = pawn_attacks;
 
     // Penalty for doubled pawns
-    score +=
-        doubled_pawn * builtin::popcount(bb & (attacks::shift<UP>(bb) | attacks::shift<UP>(attacks::shift<UP>(bb))));
-    TraceAdd(doubled_pawn,
-             builtin::popcount(bb & (attacks::shift<UP>(bb) | attacks::shift<UP>(attacks::shift<UP>(bb)))));
+    count = builtin::popcount(bb & attacks::shift<Direction::NORTH>(bb));
+    score += pawn_doubled[0] * count;
+    TraceAdd(pawn_doubled[0]);
+
+    count = builtin::popcount(bb & attacks::shift<Direction::NORTH>(attacks::shift<Direction::NORTH>(bb)));
+    score += pawn_doubled[1] * count;
+    TraceAdd(pawn_doubled[1]);
+
+    // Bonus for pawns protecting pawns
+    count = builtin::popcount(bb & get_pawn_attacks<~c>(bb));
+    score += pawn_support * count;
+    TraceAdd(pawn_support);
 
     // Bonus for phalanx pawns
-    while (pawn_phalanx) {
-        Square sq = builtin::poplsb(pawn_phalanx);
+    while (phalanx_pawns) {
+        Square sq = builtin::poplsb(phalanx_pawns);
 
-        score += phalanx_pawns[(int)utils::squareRank(white_relative_square<c>(sq))];
-        TraceIncr(phalanx_pawns[(int)utils::squareRank(white_relative_square<c>(sq))]);
+        score += pawn_phalanx[white_relative_square<c>(sq) >> 3];
+        TraceIncr(pawn_phalanx[white_relative_square<c>(sq) >> 3]);
     }
 
     while (bb) {
         Square sq = builtin::poplsb(bb);
 
-        // Bonus if pawn is protected by pawn
-        if (info.pawn_attacks[(int)c] & (1ULL << sq)) {
-            score += protected_by_pawn[0];
-            TraceIncr(protected_by_pawn[0]);
+        // Penalty is pawn is isolated
+        if (!(pawn_isolated_mask[sq] & info.pawn[(int)c])) {
+            score += pawn_isolated;
+            TraceIncr(pawn_isolated);
         }
 
         // Bonus if pawn is passed
         if (!(passed_pawn_mask[(int)c][sq] & info.pawn[(int)~c])) {
-            score += passed_pawns[(int)utils::squareRank(white_relative_square<c>(sq))];
-            TraceIncr(passed_pawns[(int)utils::squareRank(white_relative_square<c>(sq))]);
-        }
+            int protectors = builtin::popcount(info.pawn[(int)c] & attacks::pawn(~c, sq));
 
-        // Penalty is pawn is isolated
-        if (!(isolated_pawn_mask[sq] & info.pawn[(int)c])) {
-            score += isolated_pawn;
-            TraceIncr(isolated_pawn);
+            // Bonus if passed pawn is protected by pawn
+            score += pawn_passed[protectors][white_relative_square<c>(sq) >> 3];
+            TraceIncr(pawn_passed[protectors][white_relative_square<c>(sq) >> 3]);
         }
 
         score += pst[0][black_relative_square<c>(sq)];
@@ -223,8 +176,14 @@ int eval_pawn(EvalInfo &info, const Board &board, Trace &trace) {
 
 template <Color c, PieceType p>
 int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
-    int score   = 0;
+    int score = 0, count = 0;
     Bitboard bb = board.pieces(p, c);
+
+    // Init useful directions
+    const Direction UP   = c == Color::WHITE ? Direction::NORTH : Direction::SOUTH;
+    const Direction DOWN = c == Color::WHITE ? Direction::SOUTH : Direction::NORTH;
+
+    // Increase gamephase
     info.gamephase += phase_values[(int)p] * builtin::popcount(bb);
 
     // Bishop pair bonus
@@ -233,33 +192,34 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
         TraceIncr(bishop_pair);
     }
 
+    // Bonus for minor piece behind pawn
+    if (p == PieceType::KNIGHT || p == PieceType::BISHOP) {
+        count = builtin::popcount(bb & attacks::shift<DOWN>(info.pawn[(int)c]));
+        score += minor_behind_pawn * count;
+        TraceAdd(minor_behind_pawn);
+    }
+
     while (bb) {
         Square sq = builtin::poplsb(bb);
 
         // Open and Semi-Open file bonus
-        if ((int)p >= 3) {
+        if (p == PieceType::ROOK) {
             Bitboard file = attacks::MASK_FILE[(int)utils::squareFile(sq)];
             if (!(file & info.pawn[(int)c])) {
                 if (!(file & info.pawn[(int)~c])) {
-                    score += open_file[(int)p - 3];
-                    TraceIncr(open_file[(int)p - 3]);
+                    score += open_file;
+                    TraceIncr(open_file);
                 } else {
-                    score += semi_open_file[(int)p - 3];
-                    TraceIncr(semi_open_file[(int)p - 3]);
+                    score += semi_open_file;
+                    TraceIncr(semi_open_file);
                 }
             }
         }
 
-        // Bonus if piece is protected by pawn
-        if (info.pawn_attacks[(int)c] & (1ULL << sq)) {
-            score += protected_by_pawn[(int)p];
-            TraceIncr(protected_by_pawn[(int)p]);
-        }
-
         // Penalty is piece is attacked by pawn
         if (info.pawn_attacks[(int)~c] & (1ULL << sq)) {
-            score += attacked_by_pawn[c == board.sideToMove()];
-            TraceIncr(attacked_by_pawn[c == board.sideToMove()]);
+            score += attacked_by_pawn[(int)p];
+            TraceIncr(attacked_by_pawn[(int)p]);
         }
 
         // Get move bb for piece
@@ -270,7 +230,7 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
             moves = attacks::bishop(sq, board.occ());
         else if (p == PieceType::ROOK)
             moves = attacks::rook(sq, board.occ());
-        else if (p == PieceType::QUEEN || p == PieceType::KING)
+        else if (p == PieceType::QUEEN)
             moves = attacks::queen(sq, board.occ());
 
         // Bonus/penalty for number of moves per piece
@@ -285,33 +245,58 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
     return score;
 }
 
-void eval_pieces(EvalInfo &info, const Board &board, Trace &trace) {
+template <Color c>
+int eval_king(EvalInfo &info, const Board &board, Trace &trace) {
+    int score      = 0;
+    Bitboard bb    = board.pieces(PieceType::KING, c);
+    Square king_sq = builtin::poplsb(bb);
+
+    // Init useful bitboards
+    Bitboard moves = attacks::queen(king_sq, board.occ());
+
+    // Bonus/penalty for number of squares king could be attacked from
+    score += king_open[builtin::popcount(moves & ~board.us(c) & ~info.pawn_attacks[(int)~c])];
+    TraceIncr(king_open[builtin::popcount(moves & ~board.us(c) & ~info.pawn_attacks[(int)~c])]);
+
+    // Bonus/penalty if king threatens enemy pawn
+    if (attacks::king(king_sq) & board.pieces(PieceType::PAWN, ~c)) {
+        score += king_att_pawn;
+        TraceIncr(king_att_pawn);
+    }
+
+    score += pst[5][black_relative_square<c>(king_sq)];
+    TraceIncr(pst[5][black_relative_square<c>(king_sq)]);
+
+    return score;
+}
+
+int eval_pieces(EvalInfo &info, const Board &board, Trace &trace) {
+    return eval_pawn<Color::WHITE>(info, board, trace) - eval_pawn<Color::BLACK>(info, board, trace) +
+
+           eval_piece<Color::WHITE, PieceType::KNIGHT>(info, board, trace) +
+           eval_piece<Color::WHITE, PieceType::BISHOP>(info, board, trace) +
+           eval_piece<Color::WHITE, PieceType::ROOK>(info, board, trace) +
+           eval_piece<Color::WHITE, PieceType::QUEEN>(info, board, trace) -
+
+           eval_piece<Color::BLACK, PieceType::KNIGHT>(info, board, trace) -
+           eval_piece<Color::BLACK, PieceType::BISHOP>(info, board, trace) -
+           eval_piece<Color::BLACK, PieceType::ROOK>(info, board, trace) -
+           eval_piece<Color::BLACK, PieceType::QUEEN>(info, board, trace) +
+
+           eval_king<Color::WHITE>(info, board, trace) - eval_king<Color::BLACK>(info, board, trace);
+}
+
+void init_eval_info(EvalInfo &info, const Board &board) {
     // Add pawn bb to eval info
     info.pawn[0]         = board.pieces(PieceType::PAWN, Color::WHITE);
     info.pawn[1]         = board.pieces(PieceType::PAWN, Color::BLACK);
-    info.pawn_attacks[0] = get_pawn_attacks<Direction::NORTH>(info.pawn[0]);
-    info.pawn_attacks[1] = get_pawn_attacks<Direction::SOUTH>(info.pawn[1]);
-
-    info.score += eval_pawn<Color::WHITE>(info, board, trace);
-    info.score -= eval_pawn<Color::BLACK>(info, board, trace);
-
-    info.score += eval_piece<Color::WHITE, PieceType::KNIGHT>(info, board, trace);
-    info.score += eval_piece<Color::WHITE, PieceType::BISHOP>(info, board, trace);
-    info.score += eval_piece<Color::WHITE, PieceType::ROOK>(info, board, trace);
-    info.score += eval_piece<Color::WHITE, PieceType::QUEEN>(info, board, trace);
-
-    info.score -= eval_piece<Color::BLACK, PieceType::KNIGHT>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, PieceType::BISHOP>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, PieceType::ROOK>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, PieceType::QUEEN>(info, board, trace);
-
-    info.score += eval_piece<Color::WHITE, PieceType::KING>(info, board, trace);
-    info.score -= eval_piece<Color::BLACK, PieceType::KING>(info, board, trace);
+    info.pawn_attacks[0] = get_pawn_attacks<Color::WHITE>(info.pawn[0]);
+    info.pawn_attacks[1] = get_pawn_attacks<Color::BLACK>(info.pawn[1]);
 }
 
-double endgame_scale(EvalInfo &info) {
+double endgame_scale(EvalInfo &info, int score) {
     // Divide the endgame score if the stronger side doesn't have many pawns left
-    int num_missing_stronger_pawns = 8 - builtin::popcount(info.pawn[info.score < 0]);
+    int num_missing_stronger_pawns = 8 - builtin::popcount(info.pawn[score < 0]);
     return (128 - num_missing_stronger_pawns * num_missing_stronger_pawns) / 128.0;
 }
 
@@ -321,15 +306,16 @@ int evaluate(const Board &board, Trace &trace) {
 
     EvalInfo info;
 
-    eval_pieces(info, board, trace);
+    init_eval_info(info, board);
+
+    int score = eval_pieces(info, board, trace);
+
+    trace.endgame_scale = endgame_scale(info, score);
 
     info.gamephase = std::min(info.gamephase, 24);
-    info.scale     = endgame_scale(info);
 
-    trace.endgame_scale = info.scale;
-
-    int score =
-        (mg_score(info.score) * info.gamephase + eg_score(info.score) * (24 - info.gamephase) * info.scale) / 24;
+    score =
+        (mg_score(score) * info.gamephase + eg_score(score) * (24 - info.gamephase) * endgame_scale(info, score)) / 24;
 
     return (board.sideToMove() == Color::WHITE ? score : -score);
 }
@@ -356,18 +342,22 @@ parameters_t LuxEval::get_initial_parameters() {
     get_initial_parameter_array(parameters, material, 6);
 
     get_initial_parameter_array_2d(parameters, pst, 6, 64);
-    get_initial_parameter_array_2d(parameters, mobility, 5, 28);
 
-    get_initial_parameter_array(parameters, passed_pawns, 8);
-    get_initial_parameter_array(parameters, phalanx_pawns, 8);
-    get_initial_parameter_array(parameters, protected_by_pawn, 6);
-    get_initial_parameter_array(parameters, open_file, 3);
-    get_initial_parameter_array(parameters, semi_open_file, 3);
-    get_initial_parameter_array(parameters, attacked_by_pawn, 2);
+    get_initial_parameter_array_2d(parameters, pawn_passed, 3, 8);
+    get_initial_parameter_array(parameters, pawn_phalanx, 8);
+    get_initial_parameter_array(parameters, pawn_doubled, 2);
+    get_initial_parameter_single(parameters, pawn_isolated);
+    get_initial_parameter_single(parameters, pawn_support);
 
+    get_initial_parameter_array_2d(parameters, mobility, 4, 28);
+    get_initial_parameter_array(parameters, attacked_by_pawn, 6);
+    get_initial_parameter_single(parameters, open_file);
+    get_initial_parameter_single(parameters, semi_open_file);
     get_initial_parameter_single(parameters, bishop_pair);
-    get_initial_parameter_single(parameters, doubled_pawn);
-    get_initial_parameter_single(parameters, isolated_pawn);
+    get_initial_parameter_single(parameters, minor_behind_pawn);
+
+    get_initial_parameter_array(parameters, king_open, 28);
+    get_initial_parameter_single(parameters, king_att_pawn);
 
     return parameters;
 }
@@ -378,18 +368,22 @@ static coefficients_t get_coefficients(const Trace &trace) {
     get_coefficient_array(coefficients, trace.material, 6);
 
     get_coefficient_array_2d(coefficients, trace.pst, 6, 64);
-    get_coefficient_array_2d(coefficients, trace.mobility, 5, 28);
 
-    get_coefficient_array(coefficients, trace.passed_pawns, 8);
-    get_coefficient_array(coefficients, trace.phalanx_pawns, 8);
-    get_coefficient_array(coefficients, trace.protected_by_pawn, 6);
-    get_coefficient_array(coefficients, trace.open_file, 3);
-    get_coefficient_array(coefficients, trace.semi_open_file, 3);
-    get_coefficient_array(coefficients, trace.attacked_by_pawn, 2);
+    get_coefficient_array_2d(coefficients, trace.pawn_passed, 3, 8);
+    get_coefficient_array(coefficients, trace.pawn_phalanx, 8);
+    get_coefficient_array(coefficients, trace.pawn_doubled, 2);
+    get_coefficient_single(coefficients, trace.pawn_isolated);
+    get_coefficient_single(coefficients, trace.pawn_support);
 
+    get_coefficient_array_2d(coefficients, trace.mobility, 4, 28);
+    get_coefficient_array(coefficients, trace.attacked_by_pawn, 6);
+    get_coefficient_single(coefficients, trace.open_file);
+    get_coefficient_single(coefficients, trace.semi_open_file);
     get_coefficient_single(coefficients, trace.bishop_pair);
-    get_coefficient_single(coefficients, trace.doubled_pawn);
-    get_coefficient_single(coefficients, trace.isolated_pawn);
+    get_coefficient_single(coefficients, trace.minor_behind_pawn);
+
+    get_coefficient_array(coefficients, trace.king_open, 28);
+    get_coefficient_single(coefficients, trace.king_att_pawn);
 
     return coefficients;
 }
@@ -526,30 +520,38 @@ static void normalize_2d(parameters_t &parameters, int &index, int count1, int c
 void LuxEval::print_parameters(const parameters_t &parameters) {
     int index = 0;
     stringstream ss;
-    parameters_t bb = parameters;
+    parameters_t copy = parameters;
 
-    int pst_index_offset = 6, mobility_index_offset = 6 + 6 * 64;
-    normalize_2d(bb, pst_index_offset, 6, 64, 0);
-    normalize_2d(bb, mobility_index_offset, 5, 28, 1);
+    // int pst_index_offset = 6, mobility_index_offset = 6 + 6 * 64;
+    // normalize_2d(copy, pst_index_offset, 6, 64, 0);
+    // normalize_2d(copy, mobility_index_offset, 5, 28, 1);
 
-    print_array(ss, bb, index, "material", 6);
+    print_array(ss, copy, index, "material", 6);
     ss << endl;
 
-    print_pst(ss, bb, index, "pst", 6, 64);
-    print_array_2d(ss, bb, index, "mobility", 5, 28);
+    print_pst(ss, copy, index, "pst", 6, 64);
     ss << endl;
 
-    print_array(ss, bb, index, "passed_pawns", 8);
-    print_array(ss, bb, index, "phalanx_pawns", 8);
-    print_array(ss, bb, index, "protected_by_pawn", 6);
-    print_array(ss, bb, index, "open_file", 3);
-    print_array(ss, bb, index, "semi_open_file", 3);
-    print_array(ss, bb, index, "attacked_by_pawn", 2);
+    ss << "// Pawn Eval" << endl;
+    print_array_2d(ss, copy, index, "pawn_passed", 3, 8);
+    print_array(ss, copy, index, "pawn_phalanx", 8);
+    print_array(ss, copy, index, "pawn_doubled", 2);
+    print_single(ss, copy, index, "pawn_isolated");
+    print_single(ss, copy, index, "pawn_support");
     ss << endl;
 
-    print_single(ss, bb, index, "bishop_pair");
-    print_single(ss, bb, index, "doubled_pawn");
-    print_single(ss, bb, index, "isolated_pawn");
+    ss << "// Piece Eval" << endl;
+    print_array_2d(ss, copy, index, "mobility", 4, 28);
+    print_array(ss, copy, index, "attacked_by_pawn", 6);
+    print_single(ss, copy, index, "open_file");
+    print_single(ss, copy, index, "semi_open_file");
+    print_single(ss, copy, index, "bishop_pair");
+    print_single(ss, copy, index, "minor_behind_pawn");
+    ss << endl;
+
+    ss << "// King Eval" << endl;
+    print_array(ss, copy, index, "king_open", 28);
+    print_single(ss, copy, index, "king_att_pawn");
     ss << endl;
 
     cout << ss.str() << "\n";
