@@ -33,6 +33,7 @@ struct Trace {
 
     int king_open[28][2]{};
     int king_att_pawn[2]{};
+    int king_shelter[2]{};
 };
 
 struct EvalInfo {
@@ -66,6 +67,7 @@ const int minor_behind_pawn   = S(0, 0);
 // King Eval
 const int king_open[28] = {};
 const int king_att_pawn = S(0, 0);
+const int king_shelter  = S(0, 0);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Evaluation
@@ -247,7 +249,7 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
 
 template <Color c>
 int eval_king(EvalInfo &info, const Board &board, Trace &trace) {
-    int score      = 0;
+    int score = 0, count = 0;
     Bitboard bb    = board.pieces(PieceType::KING, c);
     Square king_sq = builtin::poplsb(bb);
 
@@ -259,10 +261,15 @@ int eval_king(EvalInfo &info, const Board &board, Trace &trace) {
     TraceIncr(king_open[builtin::popcount(moves & ~board.us(c) & ~info.pawn_attacks[(int)~c])]);
 
     // Bonus/penalty if king threatens enemy pawn
-    if (attacks::king(king_sq) & board.pieces(PieceType::PAWN, ~c)) {
+    if (attacks::king(king_sq) & info.pawn[(int)~c]) {
         score += king_att_pawn;
         TraceIncr(king_att_pawn);
     }
+
+    // Bonus for pawn sheltering king
+    count = builtin::popcount(passed_pawn_mask[(int)c][king_sq] & info.pawn[(int)c]);
+    score += king_shelter * count;
+    TraceAdd(king_shelter);
 
     score += pst[5][black_relative_square<c>(king_sq)];
     TraceIncr(pst[5][black_relative_square<c>(king_sq)]);
@@ -358,6 +365,7 @@ parameters_t LuxEval::get_initial_parameters() {
 
     get_initial_parameter_array(parameters, king_open, 28);
     get_initial_parameter_single(parameters, king_att_pawn);
+    get_initial_parameter_single(parameters, king_shelter);
 
     return parameters;
 }
@@ -384,6 +392,7 @@ static coefficients_t get_coefficients(const Trace &trace) {
 
     get_coefficient_array(coefficients, trace.king_open, 28);
     get_coefficient_single(coefficients, trace.king_att_pawn);
+    get_coefficient_single(coefficients, trace.king_shelter);
 
     return coefficients;
 }
@@ -552,6 +561,7 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
     ss << "// King Eval" << endl;
     print_array(ss, copy, index, "king_open", 28);
     print_single(ss, copy, index, "king_att_pawn");
+    print_single(ss, copy, index, "king_shelter");
     ss << endl;
 
     cout << ss.str() << "\n";
