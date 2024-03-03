@@ -30,6 +30,7 @@ struct Trace {
     int semi_open_file[2]{};
     int bishop_pair[2]{};
     int minor_behind_pawn[2]{};
+    int outpost[2]{};
 
     int king_open[28][2]{};
     int king_att_pawn[2]{};
@@ -63,6 +64,7 @@ const int open_file           = S(0, 0);
 const int semi_open_file      = S(0, 0);
 const int bishop_pair         = S(0, 0);
 const int minor_behind_pawn   = S(0, 0);
+// const int outpost             = S(0, 0);
 
 // King Eval
 const int king_open[28] = {};
@@ -199,6 +201,12 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
         count = builtin::popcount(bb & attacks::shift<DOWN>(info.pawn[(int)c]));
         score += minor_behind_pawn * count;
         TraceAdd(minor_behind_pawn);
+
+        // Bitboard protected_minor = info.pawn_attacks[(int)c] & bb;
+        // for (int i = 0; i < 4; i++) protected_minor = attacks::shift<DOWN>(protected_minor);
+        // count = builtin::popcount(protected_minor);
+        // score += outpost * count;
+        // TraceAdd(outpost);
     }
 
     while (bb) {
@@ -361,6 +369,7 @@ parameters_t LuxEval::get_initial_parameters() {
     get_initial_parameter_single(parameters, semi_open_file);
     get_initial_parameter_single(parameters, bishop_pair);
     get_initial_parameter_single(parameters, minor_behind_pawn);
+    // get_initial_parameter_single(parameters, outpost);
 
     get_initial_parameter_array(parameters, king_open, 28);
     get_initial_parameter_single(parameters, king_att_pawn);
@@ -388,6 +397,7 @@ static coefficients_t get_coefficients(const Trace &trace) {
     get_coefficient_single(coefficients, trace.semi_open_file);
     get_coefficient_single(coefficients, trace.bishop_pair);
     get_coefficient_single(coefficients, trace.minor_behind_pawn);
+    // get_coefficient_single(coefficients, trace.outpost);
 
     get_coefficient_array(coefficients, trace.king_open, 28);
     get_coefficient_single(coefficients, trace.king_att_pawn);
@@ -497,6 +507,30 @@ static void print_pst(std::stringstream &ss, const parameters_t &parameters, int
     ss << "};\n";
 }
 
+static void print_mobility(std::stringstream &ss, const parameters_t &parameters, int &index, const std::string &name) {
+    string names[4] = {"Knight", "Bishop", "Rook", "Queen"};
+    int moves[4]    = {8, 13, 14, 27};
+
+    ss << "int " << name << "[4][28] = {\n";
+    for (auto i = 0; i < 4; i++) {
+        ss << "// " << names[i] << " (0-" << moves[i] << ")\n";
+        ss << "{";
+        for (auto j = 0; j < 28; j++) {
+            if (j <= moves[i]) {
+                print_parameter(ss, parameters[index]);
+
+                if (j == moves[i]) ss << "}";
+
+                ss << ", ";
+            }
+
+            index++;
+        }
+        ss << '\n';
+    }
+    ss << "};\n";
+}
+
 static void normalize_2d(parameters_t &parameters, int &index, int count1, int count2, int offset) {
     for (auto i = 0; i < count1; i++) {
         int sum0 = 0, sum1 = 0, cnt0 = 0, cnt1 = 0;
@@ -549,12 +583,13 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
     ss << endl;
 
     ss << "// Piece Eval" << endl;
-    print_array_2d(ss, copy, index, "mobility", 4, 28);
+    print_mobility(ss, copy, index, "mobility");
     print_array(ss, copy, index, "attacked_by_pawn", 6);
     print_single(ss, copy, index, "open_file");
     print_single(ss, copy, index, "semi_open_file");
     print_single(ss, copy, index, "bishop_pair");
     print_single(ss, copy, index, "minor_behind_pawn");
+    // print_single(ss, copy, index, "outpost");
     ss << endl;
 
     ss << "// King Eval" << endl;
@@ -563,5 +598,5 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
     print_single(ss, copy, index, "king_shelter");
     ss << endl;
 
-    cout << ss.str() << "\n";
+    std::cout << ss.str() << "\n";
 }
