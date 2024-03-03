@@ -47,8 +47,7 @@ struct EvalInfo {
 int phase_values[6] = {0, 1, 1, 2, 4, 0};
 
 const int material[6] = {};
-
-int pst[6][64] = {};
+int pst[6][64]        = {};
 
 // Pawn Eval
 const int pawn_passed[3][8] = {};
@@ -531,16 +530,17 @@ static void print_mobility(std::stringstream &ss, const parameters_t &parameters
     ss << "};\n";
 }
 
-static void normalize_2d(parameters_t &parameters, int &index, int count1, int count2, int offset) {
+static void normalize_2d(parameters_t &parameters, int index, int count1, int count2, int offset) {
     for (auto i = 0; i < count1; i++) {
         int sum0 = 0, sum1 = 0, cnt0 = 0, cnt1 = 0;
 
         for (auto j = 0; j < count2; j++) {
-            if (parameters[index + count2 * i + j][0] != 0 && parameters[index + count2 * i + j][1] != 0) {
-                sum0 += parameters[index + count2 * i + j][0];
+            int parameter_index = index + count2 * i + j;
+            if (parameters[parameter_index][0] != 0 && parameters[parameter_index][1] != 0) {
+                sum0 += parameters[parameter_index][0];
                 cnt0++;
 
-                sum1 += parameters[index + count2 * i + j][1];
+                sum1 += parameters[parameter_index][1];
                 cnt1++;
             }
         }
@@ -551,9 +551,10 @@ static void normalize_2d(parameters_t &parameters, int &index, int count1, int c
         }
 
         for (auto j = 0; j < count2; j++) {
-            if (parameters[index + count2 * i + j][0] != 0 && parameters[index + count2 * i + j][1] != 0) {
-                parameters[index + count2 * i + j][0] -= sum0 / cnt0;
-                parameters[index + count2 * i + j][1] -= sum1 / cnt1;
+            int parameter_index = index + count2 * i + j;
+            if (parameters[parameter_index][0] != 0 && parameters[parameter_index][1] != 0) {
+                parameters[parameter_index][0] -= sum0 / cnt0;
+                parameters[parameter_index][1] -= sum1 / cnt1;
             }
         }
     }
@@ -564,9 +565,8 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
     stringstream ss;
     parameters_t copy = parameters;
 
-    // int pst_index_offset = 6, mobility_index_offset = 6 + 6 * 64;
-    // normalize_2d(copy, pst_index_offset, 6, 64, 0);
-    // normalize_2d(copy, mobility_index_offset, 5, 28, 1);
+    normalize_2d(copy, 6, 6, 64, 0);
+    normalize_2d(copy, 6 + 6 * 64 + 3 * 8 + 8 + 2 + 1 + 1, 4, 28, 1);
 
     print_array(ss, copy, index, "material", 6);
     ss << endl;
