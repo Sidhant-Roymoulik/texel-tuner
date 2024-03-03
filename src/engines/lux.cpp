@@ -63,7 +63,7 @@ const int open_file           = S(0, 0);
 const int semi_open_file      = S(0, 0);
 const int bishop_pair         = S(0, 0);
 const int minor_behind_pawn   = S(0, 0);
-// const int outpost             = S(0, 0);
+const int outpost             = S(0, 0);
 
 // King Eval
 const int king_open[28] = {};
@@ -77,7 +77,7 @@ const int king_shelter  = S(0, 0);
 #define TraceIncr(parameter) trace.parameter[(int)c]++
 #define TraceAdd(parameter) trace.parameter[(int)c] += count
 
-Bitboard passed_pawn_mask[2][64], pawn_isolated_mask[64];
+Bitboard passed_pawn_mask[2][64], pawn_isolated_mask[64], outpost_mask[2];
 
 void init_eval_tables() {
     for (int i = (int)PieceType::PAWN; i <= (int)PieceType::KING; i++) {
@@ -85,6 +85,9 @@ void init_eval_tables() {
             pst[i][j] += material[i];
         }
     }
+
+    outpost_mask[0] = attacks::MASK_RANK[4] | attacks::MASK_RANK[5] | attacks::MASK_RANK[6] | attacks::MASK_RANK[7];
+    outpost_mask[1] = attacks::MASK_RANK[0] | attacks::MASK_RANK[1] | attacks::MASK_RANK[2] | attacks::MASK_RANK[3];
 
     for (int i = Square::SQ_A1; i <= Square::SQ_H8; i++) {
         Bitboard file = attacks::MASK_FILE[(int)utils::squareFile(Square(i))];
@@ -201,11 +204,10 @@ int eval_piece(EvalInfo &info, const Board &board, Trace &trace) {
         score += minor_behind_pawn * count;
         TraceAdd(minor_behind_pawn);
 
-        // Bitboard protected_minor = info.pawn_attacks[(int)c] & bb;
-        // for (int i = 0; i < 4; i++) protected_minor = attacks::shift<DOWN>(protected_minor);
-        // count = builtin::popcount(protected_minor);
-        // score += outpost * count;
-        // TraceAdd(outpost);
+        // Bonus for knight/bishop outposts
+        count = builtin::popcount(bb & info.pawn_attacks[(int)c] & outpost_mask[(int)c]);
+        score += outpost * count;
+        TraceAdd(outpost);
     }
 
     while (bb) {
@@ -368,7 +370,7 @@ parameters_t LuxEval::get_initial_parameters() {
     get_initial_parameter_single(parameters, semi_open_file);
     get_initial_parameter_single(parameters, bishop_pair);
     get_initial_parameter_single(parameters, minor_behind_pawn);
-    // get_initial_parameter_single(parameters, outpost);
+    get_initial_parameter_single(parameters, outpost);
 
     get_initial_parameter_array(parameters, king_open, 28);
     get_initial_parameter_single(parameters, king_att_pawn);
@@ -396,7 +398,7 @@ static coefficients_t get_coefficients(const Trace &trace) {
     get_coefficient_single(coefficients, trace.semi_open_file);
     get_coefficient_single(coefficients, trace.bishop_pair);
     get_coefficient_single(coefficients, trace.minor_behind_pawn);
-    // get_coefficient_single(coefficients, trace.outpost);
+    get_coefficient_single(coefficients, trace.outpost);
 
     get_coefficient_array(coefficients, trace.king_open, 28);
     get_coefficient_single(coefficients, trace.king_att_pawn);
@@ -532,7 +534,8 @@ static void print_mobility(std::stringstream &ss, const parameters_t &parameters
 
 static void normalize_2d(parameters_t &parameters, int index, int count1, int count2, int offset) {
     for (auto i = 0; i < count1; i++) {
-        int sum0 = 0, sum1 = 0, cnt0 = 0, cnt1 = 0;
+        tune_t sum0 = 0, sum1 = 0;
+        int cnt0 = 0, cnt1 = 0;
 
         for (auto j = 0; j < count2; j++) {
             int parameter_index = index + count2 * i + j;
@@ -589,7 +592,7 @@ void LuxEval::print_parameters(const parameters_t &parameters) {
     print_single(ss, copy, index, "semi_open_file");
     print_single(ss, copy, index, "bishop_pair");
     print_single(ss, copy, index, "minor_behind_pawn");
-    // print_single(ss, copy, index, "outpost");
+    print_single(ss, copy, index, "outpost");
     ss << endl;
 
     ss << "// King Eval" << endl;
