@@ -199,7 +199,9 @@ static void set_fen(Position& pos, const string& fen) {
 [[nodiscard]] static u64 get_mobility(const i32 sq, const i32 piece,
     const Position* pos) {
     u64 moves = 0;
-    if (piece == Knight) {
+/*    if (piece == Pawn) {
+        moves = north(1ULL << sq);
+    } else*/ if (piece == Knight) {
         moves = knight(sq, 0);
     }
     else if (piece == King) {
@@ -225,8 +227,12 @@ struct Trace
     int material[6][2]{};
     int pst_rank[48][2]{};
     int pst_file[48][2]{};
+    int mobilities[6][2]{};
+    int king_attacks[6][2]{};
     int open_files[6][2]{};
-    int protected_pawn[2]{};
+    //int protected_pawn[2]{};
+    //int passed_pawns[7][2]{};
+    //int passed_pawn[2]{};
     //int phalanx_pawn[2]{};
     int bishop_pair[2]{};
 };
@@ -250,7 +256,11 @@ const i32 pst_file[] = {
     S(-2, -5), S(2, -1),  S(-1, 1), S(-4, 2), S(-4, 2), S(-2, 2), S(2, -1), S(0, -5),   // King
 };
 const i32 open_files[] = { 0,0,0,0,0,0 };
-const i32 protected_pawn = 0;
+const i32 mobilities[] = { 0,0,0,0,0,0 };
+const i32 king_attacks[] = { 0,0,0,0,0,0 };
+//const i32 protected_pawn = 0;
+//const i32 passed_pawn = 0;
+//const i32 passed_pawns[] = { 0,0,0,0,0,0,0 };
 //const i32 phalanx_pawn = 0;
 const i32 bishop_pair = 0;
 
@@ -266,10 +276,13 @@ static Trace eval(Position& pos) {
         const int color = pos.flipped;
 
         const u64 own_pawns = pos.colour[0] & pos.pieces[Pawn];
+        u64 no_passers = pos.colour[1] & pos.pieces[Pawn];
+        no_passers |= se(no_passers) | sw(no_passers);
+        const u64 opp_king_zone = king(lsb(pos.colour[1] & pos.pieces[King]), 0);
         //const u64 pawn_protected = nw(own_pawns) | ne(own_pawns);
 
-        score += protected_pawn * count(own_pawns & (nw(own_pawns) | ne(own_pawns) | east(own_pawns)));
-        TraceAdd(protected_pawn, count(own_pawns & (nw(own_pawns) | ne(own_pawns) | east(own_pawns))));
+        //score += protected_pawn * count(own_pawns & (nw(own_pawns) | ne(own_pawns)));
+        //TraceAdd(protected_pawn, count(own_pawns & (nw(own_pawns) | ne(own_pawns))));
 
         //score += phalanx_pawn * count(own_pawns & west(own_pawns));
         //TraceAdd(phalanx_pawn, count(own_pawns & west(own_pawns)));
@@ -301,9 +314,26 @@ static Trace eval(Position& pos) {
                 score += pst_file[p * 8 + file] * 1;
                 TraceAdd(pst_file[p * 8 + file], 1);
 
-                if ((0x101010101010101UL << sq % 8 & ~(1UL << sq) & own_pawns) == 0) {
+                if ((north(0x101010101010101UL << sq) & own_pawns) == 0) {
+                //if ((0x101010101010101ULL << file & ~(1ULL << sq) & own_pawns) == 0) {
                     score += open_files[p];
                     TraceIncr(open_files[p]);
+                }
+
+                //if (p == Pawn && !(0x101010101010101ull << sq & no_passers)) {
+                //    score += passed_pawns[rank];
+                //    TraceIncr(passed_pawns[rank]);
+                //}
+
+                const u64 mobility = get_mobility(sq, p /*== King ? Queen : p*/, &pos);
+                if (p != Knight) {
+                    score += mobilities[p] * count(mobility & ~pos.colour[0]);
+                    TraceAdd(mobilities[p], count(mobility & ~pos.colour[0]));
+
+                    if (p != King && p != Pawn) {
+                        score += king_attacks[p] * count(mobility & opp_king_zone);
+                        TraceAdd(king_attacks[p], count(mobility & opp_king_zone));
+                    }
                 }
             }
         }
@@ -483,9 +513,12 @@ parameters_t FourkdotcppEval::get_initial_parameters()
     get_initial_parameter_array(parameters, material, 6);
     get_initial_parameter_array(parameters, pst_rank, 48);
     get_initial_parameter_array(parameters, pst_file, 48);
+    get_initial_parameter_array(parameters, mobilities, 6);
+    get_initial_parameter_array(parameters, king_attacks, 6);
     get_initial_parameter_array(parameters, open_files, 6);
-    //get_initial_parameter_array(parameters, protected_pawn, 6);
-    get_initial_parameter_single(parameters, protected_pawn);
+    //get_initial_parameter_array(parameters, passed_pawns, 7);
+    //get_initial_parameter_single(parameters, protected_pawn);
+    //get_initial_parameter_single(parameters, passed_pawn);
     //get_initial_parameter_single(parameters, phalanx_pawn);
     get_initial_parameter_single(parameters, bishop_pair);
     return parameters;
@@ -497,10 +530,13 @@ static coefficients_t get_coefficients(const Trace& trace)
     get_coefficient_array(coefficients, trace.material, 6);
     get_coefficient_array(coefficients, trace.pst_rank, 48);
     get_coefficient_array(coefficients, trace.pst_file, 48);
+    get_coefficient_array(coefficients, trace.mobilities, 6);
+    get_coefficient_array(coefficients, trace.king_attacks, 6);
     get_coefficient_array(coefficients, trace.open_files, 6);
-    ///get_coefficient_array(coefficients, trace.protected_pawn, 6);
-    get_coefficient_single(coefficients, trace.protected_pawn);
-    //get_coefficient_single(coefficients, trace.phalanx_pawn);1
+    //get_coefficient_array(coefficients, trace.passed_pawns, 7);
+    //get_coefficient_single(coefficients, trace.protected_pawn);
+    //get_coefficient_single(coefficients, trace.passed_pawn);
+    //get_coefficient_single(coefficients, trace.phalanx_pawn);
     get_coefficient_single(coefficients, trace.bishop_pair);
     return coefficients;
 }
@@ -516,9 +552,12 @@ void FourkdotcppEval::print_parameters(const parameters_t& parameters)
     print_array(ss, parameters_copy, index, "material", 6);
     print_pst(ss, parameters_copy, index, "pst_rank");
     print_pst(ss, parameters_copy, index, "pst_file");
+    print_array(ss, parameters_copy, index, "mobilities", 6);
+    print_array(ss, parameters_copy, index, "king_attacks", 6);
     print_array(ss, parameters_copy, index, "open_files", 6);
-    //print_array(ss, parameters_copy, index, "protected_pawn", 6);
-    print_single(ss, parameters_copy, index, "protected_pawn");
+    //print_array(ss, parameters_copy, index, "passed_pawns", 7);
+    //print_single(ss, parameters_copy, index, "protected_pawn");
+    //print_single(ss, parameters_copy, index, "passed_pawn");
     //print_single(ss, parameters_copy, index, "phalanx_pawn");
     print_single(ss, parameters_copy, index, "bishop_pair");
     cout << ss.str() << "\n";
