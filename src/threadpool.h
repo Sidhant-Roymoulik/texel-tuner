@@ -8,7 +8,7 @@
 #include <thread>
 
 class ThreadPool {
-public:
+   public:
     void start(uint32_t thread_count);
     uint32_t thread_count() const;
     void enqueue(const std::function<void()>& job);
@@ -16,8 +16,8 @@ public:
     bool is_idle();
     void wait_for_completion();
 
-private:
-    bool should_stop = false;
+   private:
+    bool should_stop           = false;
     uint32_t running_job_count = 0;
     std::mutex queue_mutex;
     std::condition_variable mutex_condition;
@@ -28,4 +28,4 @@ private:
     void thread_loop();
 };
 
-#endif // !THREADPOOL_H
+#endif  // !THREADPOOL_H

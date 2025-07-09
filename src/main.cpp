@@ -1,10 +1,10 @@
-#include "tuner.h"
-
 #include <fstream>
 #include <iostream>
-#include <string>
 #include <sstream>
+#include <string>
 #include <vector>
+
+#include "tuner.h"
 
 using namespace std;
 using namespace Tuner;
@@ -12,63 +12,50 @@ using namespace Tuner;
 int main(int argc, char** argv) {
     vector<DataSource> sources;
     {
-        string csv_path = "sources.csv";
-        if (argc > 1)
-        {
+        string csv_path = "../src/sources.csv";
+        if (argc > 1) {
             csv_path = argv[1];
         }
         ifstream csv(csv_path);
-        if(!csv)
-        {
+        if (!csv) {
             cout << "Unable to open data source list " << csv_path << endl;
         }
 
-        while(!csv.eof())
-        {
+        while (!csv.eof()) {
             string line;
             getline(csv, line);
 
-            if(line.empty() || line.starts_with('#'))
-            {
+            if (line.empty() || line.starts_with('#')) {
                 continue;
             }
 
             DataSource source;
             stringstream ss(line);
-            if(!getline(ss, source.path, ','))
-            {
+            if (!getline(ss, source.path, ',')) {
                 cout << "CSV misformatted" << endl;
                 return -1;
             }
 
             string flipped_wdl_str;
-            if (!getline(ss, flipped_wdl_str, ','))
-            {
+            if (!getline(ss, flipped_wdl_str, ',')) {
                 cout << "CSV misformatted" << endl;
                 return -1;
             }
-            try
-            {
+            try {
                 source.side_to_move_wdl = stoul(flipped_wdl_str);
-            }
-            catch (const std::invalid_argument&)
-            {
+            } catch (const std::invalid_argument&) {
                 cout << flipped_wdl_str << " is not valid for a WDL flip flag";
                 return -1;
             }
 
             string position_limit_str;
-            if (!getline(ss, flipped_wdl_str, ','))
-            {
+            if (!getline(ss, flipped_wdl_str, ',')) {
                 cout << "CSV misformatted" << endl;
                 return -1;
             }
-            try
-            {
+            try {
                 source.position_limit = stoll(flipped_wdl_str);
-            }
-            catch (const std::invalid_argument&)
-            {
+            } catch (const std::invalid_argument&) {
                 cout << position_limit_str << " is not a valid position limit";
                 return -1;
             }
@@ -77,8 +64,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    if(sources.empty())
-    {
+    if (sources.empty()) {
         cout << "Data source list is empty";
         return -1;
     }

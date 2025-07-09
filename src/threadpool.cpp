@@ -5,26 +5,17 @@
 
 using namespace std;
 
-void ThreadPool::start(uint32_t thread_count)
-{
+void ThreadPool::start(uint32_t thread_count) {
     stop();
     should_stop = false;
-    for (int thread_index = 0; thread_index < thread_count; thread_index++)
-    {
-        threads.emplace_back([this]()
-        {
-            thread_loop();
-        });
+    for (int thread_index = 0; thread_index < thread_count; thread_index++) {
+        threads.emplace_back([this]() { thread_loop(); });
     }
 }
 
-uint32_t ThreadPool::thread_count() const
-{
-    return static_cast<uint32_t>(threads.size());
-}
+uint32_t ThreadPool::thread_count() const { return static_cast<uint32_t>(threads.size()); }
 
-void ThreadPool::enqueue(const function<void()>& job)
-{
+void ThreadPool::enqueue(const function<void()>& job) {
     {
         unique_lock<mutex> lock(queue_mutex);
         jobs.push(job);
@@ -32,8 +23,7 @@ void ThreadPool::enqueue(const function<void()>& job)
     mutex_condition.notify_one();
 }
 
-void ThreadPool::stop()
-{
+void ThreadPool::stop() {
     {
         unique_lock<mutex> lock(queue_mutex);
         should_stop = true;
@@ -41,45 +31,32 @@ void ThreadPool::stop()
 
     mutex_condition.notify_all();
 
-    for (thread& active_thread : threads)
-    {
+    for (thread& active_thread : threads) {
         active_thread.join();
     }
     threads.clear();
 }
 
-bool ThreadPool::is_idle()
-{
+bool ThreadPool::is_idle() {
     unique_lock<mutex> lock(queue_mutex);
     return jobs.empty() && running_job_count == 0;
 }
 
-void ThreadPool::wait_for_completion()
-{
+void ThreadPool::wait_for_completion() {
     unique_lock<mutex> lock(queue_mutex);
-    while(!jobs.empty() || running_job_count > 0)
-    {
-        completion_condition.wait(lock, [this]
-        {
-            return jobs.empty() && running_job_count == 0;
-        });
+    while (!jobs.empty() || running_job_count > 0) {
+        completion_condition.wait(lock, [this] { return jobs.empty() && running_job_count == 0; });
     }
 }
 
-void ThreadPool::thread_loop()
-{
-    while (true)
-    {
+void ThreadPool::thread_loop() {
+    while (true) {
         function<void()> job;
         {
             unique_lock<mutex> lock(queue_mutex);
-            mutex_condition.wait(lock, [this]
-            {
-                return !jobs.empty() || should_stop;
-            });
+            mutex_condition.wait(lock, [this] { return !jobs.empty() || should_stop; });
 
-            if (should_stop)
-            {
+            if (should_stop) {
                 return;
             }
 

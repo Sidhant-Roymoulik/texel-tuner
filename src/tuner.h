@@ -5,16 +5,16 @@
 #include <string>
 #include <vector>
 
-namespace Tuner
-{
-    struct DataSource
-    {
-        std::string path;
-        bool side_to_move_wdl;
-        int64_t position_limit;
-    };
+namespace Tuner {
 
-    void run(const std::vector<DataSource>& sources);
-}
+struct DataSource {
+    std::string path;
+    bool side_to_move_wdl;
+    int64_t position_limit;
+};
 
-#endif // !TUNER_H
+void run(const std::vector<DataSource>& sources);
+
+}  // namespace Tuner
+
+#endif  // !TUNER_H
