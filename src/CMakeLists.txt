@@ -7,6 +7,6 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 
 find_package(Threads REQUIRED)
 
-add_executable(tuner "main.cpp" "tuner.cpp" "threadpool.cpp" "engines/lux.cpp" "sources.csv")
+add_executable(tuner "main.cpp" "tuner.cpp" "threadpool.cpp" "engines/lux.cpp")
 
 target_link_libraries(tuner PRIVATE Threads::Threads)
