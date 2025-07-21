@@ -751,9 +751,6 @@ void Tuner::run(const std::vector<DataSource> &sources) {
         }
     }
 
-    cout << "Initial parameters:" << endl;
-    TuneEval::print_parameters(parameters);
-
     tune_t K;
     if constexpr (TuneEval::preferred_k <= 0) {
         cout << "Finding optimal K..." << endl;
@@ -818,7 +815,7 @@ void Tuner::run(const std::vector<DataSource> &sources) {
             print_elapsed(start);
             cout << "Epoch " << epoch << " (" << epochs_per_second << " eps), error " << error << ", LR "
                  << learning_rate << endl;
-            // TuneEval::print_parameters(parameters);
+            TuneEval::print_parameters(parameters);
         }
 
         if (epoch % TuneEval::learning_rate_drop_interval == 0) {
